@@ -7,7 +7,7 @@ function constraint_ohms_y_from_pst(pm::_PM.AbstractDCPModel, n::Int, i::Int, f_
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
 
-    JuMP.@constraint(pm.model, p_fr ==   -b * vm * sin(va_fr - va_to - alpha))
+    JuMP.@constraint(pm.model, p_fr ==   -b * vm * (va_fr - va_to - alpha))
 end
 
 function constraint_ohms_y_to_pst(pm::_PM.AbstractDCPModel, n::Int, i::Int, f_bus, t_bus, f_idx, t_idx, g, b, g_to, b_to)
@@ -17,10 +17,10 @@ function constraint_ohms_y_to_pst(pm::_PM.AbstractDCPModel, n::Int, i::Int, f_bu
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
 
-    JuMP.@constraint(pm.model, p_to ==  -b * vm * sin(va_to - va_fr + alpha))
+    JuMP.@constraint(pm.model, p_to ==  -b * vm * (va_to - va_fr + alpha))
     end
 
-function constraint_limits_pst(pm::_PM.AbstractDCPModel, i::Int; nw::Int=pm.cnw)
+function constraint_limits_pst(pm::_PM.AbstractDCPModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
     srated = pst["rateA"]
     angmin = pst["angmin"]

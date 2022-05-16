@@ -6,7 +6,7 @@ function variable_pst(pm; kwargs...)
 end
 
 "variable: `p[l,i,j]` for `(l,i,j)` in `arcs`"
-function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, bounded::Bool=true, report::Bool=true)
+function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     p = _PM.var(pm, nw)[:ppst] = JuMP.@variable(pm.model,
         [(l,i,j) in _PM.ref(pm, nw, :arcs_pst)], base_name="$(nw)_ppst",
         start = 0
@@ -24,7 +24,7 @@ function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, bo
 end
 
 "variable: `q[l,i,j]` for `(l,i,j)` in `arcs`"
-function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, bounded::Bool=true, report::Bool=true)
+function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     q = _PM.var(pm, nw)[:qpst] = JuMP.@variable(pm.model,
         [(l,i,j) in _PM.ref(pm, nw, :arcs_pst)], base_name="$(nw)_qpst",
         start = 0
@@ -42,7 +42,7 @@ function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, 
 end
 
 "variable: `t[i]` for `i` in `bus`es"
-function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, bounded::Bool=true, report::Bool=true)
+function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     alpha = _PM.var(pm, nw)[:psta] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :pst)], base_name="$(nw)_psta",
         start = 0
@@ -51,8 +51,6 @@ function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=pm.cnw, bounded:
         for (i, pst) in _PM.ref(pm, nw, :pst)
             JuMP.set_lower_bound(alpha[i], pst["angmin"])
             JuMP.set_upper_bound(alpha[i], pst["angmax"])
-            print(pst["angmin"],"\n")
-            print(pst["angmax"],"\n")
         end
     end
     report && _PM.sol_component_value(pm, nw, :pst, :alpha, _PM.ids(pm, nw, :pst), alpha)

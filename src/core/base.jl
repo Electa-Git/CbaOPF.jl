@@ -1,6 +1,6 @@
 # ADD REF MODEL
-function ref_add_pst!(pm::_PM.AbstractPowerModel)
-    for (nw, nw_ref) in pm.ref[:nw]
+function ref_add_pst!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
+    for (nw, nw_ref) in ref[:it][:pm][:nw]
         if !haskey(nw_ref, :pst)
             error(_LOGGER, "required pst data not found")
         end

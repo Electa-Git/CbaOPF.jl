@@ -1,6 +1,6 @@
 ###############################################
 # Constraint templates
-function constraint_ohms_y_from_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=pm.cnw)
+function constraint_ohms_y_from_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
     f_bus = pst["fbus"]
     t_bus = pst["tbus"]
@@ -14,7 +14,7 @@ function constraint_ohms_y_from_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=
     constraint_ohms_y_from_pst(pm, nw, i, f_bus, t_bus, f_idx, t_idx, g, b, g_fr, b_fr)
 end
 
-function constraint_ohms_y_to_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=pm.cnw)
+function constraint_ohms_y_to_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
     f_bus = pst["fbus"]
     t_bus = pst["tbus"]
@@ -28,7 +28,7 @@ function constraint_ohms_y_to_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=pm
     constraint_ohms_y_to_pst(pm, nw, i, f_bus, t_bus, f_idx, t_idx, g, b, g_to, b_to)
 end
 
-function constraint_power_balance_ac(pm::_PM.AbstractPowerModel, i::Int; nw::Int=pm.cnw)
+function constraint_power_balance_ac(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     bus = _PM.ref(pm, nw, :bus, i)
     bus_arcs = _PM.ref(pm, nw, :bus_arcs, i)
     bus_arcs_pst = _PM.ref(pm, nw, :bus_arcs_pst, i)

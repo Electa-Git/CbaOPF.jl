@@ -26,7 +26,7 @@ function constraint_ohms_y_to_pst(pm::_PM.AbstractACPModel, n::Int, i::Int, f_bu
     JuMP.@NLconstraint(pm.model, q_to == -(b+b_to)*vm_to^2 + b*vm_to*vm_fr*cos(va_to-va_fr+alpha) + -g*vm_to*vm_fr*sin(va_to-va_fr+alpha) )
     end
 
-function constraint_limits_pst(pm::_PM.AbstractACPModel, i::Int; nw::Int=pm.cnw)
+function constraint_limits_pst(pm::_PM.AbstractACPModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
     srated = pst["rateA"]
     angmin = pst["angmin"]

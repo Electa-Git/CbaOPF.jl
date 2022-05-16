@@ -1,15 +1,16 @@
 function solve_cbaopf(file::String, model_type::Type, optimizer; kwargs...)
     data = PowerModels.parse_file(file)
+    _PMACDC.process_additional_data!(data)
     process_pst_data!(data)
-    return _PM.run_model(data, model_type, optimizer, build_cbaopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!], kwargs...)
+    return _PM.solve_model(data, model_type, optimizer, build_cbaopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!], kwargs...)
 end
 
 function solve_cbaopf(data::Dict{String,Any}, model_type::Type, optimizer; kwargs...)
-    return _PM.run_model(data, model_type, optimizer, build_cbaopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!], kwargs...)
+    return _PM.solve_model(data, model_type, optimizer, build_cbaopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!], kwargs...)
 end
 
 ""
-function build_opst(pm::_PM.AbstractPowerModel)
+function build_cbaopf(pm::_PM.AbstractPowerModel)
     _PM.variable_bus_voltage(pm)
     _PM.variable_gen_power(pm)
     _PM.variable_branch_power(pm)
