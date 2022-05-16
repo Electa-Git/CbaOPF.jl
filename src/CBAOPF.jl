@@ -9,7 +9,8 @@ import PowerModels
 const _PM = PowerModels
 import InfrastructureModels
 const _IM = InfrastructureModels
-
+import FlexPlan
+const _FP = FlexPlan
 # Create our module level logger (this will get precompiled)
 const _LOGGER = Memento.getlogger(@__MODULE__)
 
@@ -19,6 +20,7 @@ include("core/variable.jl")
 include("core/base.jl")
 include("core/data.jl")
 include("core/constraint_template.jl")
+include("core/objective.jl")
 
 include("form/acp.jl")
 include("form/dcp.jl")

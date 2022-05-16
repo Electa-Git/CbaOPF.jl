@@ -45,5 +45,13 @@ function constraint_power_balance_ac(pm::_PM.AbstractPowerModel, i::Int; nw::Int
     bus_gs = Dict(k => _PM.ref(pm, nw, :shunt, k, "gs") for k in bus_shunts)
     bus_bs = Dict(k => _PM.ref(pm, nw, :shunt, k, "bs") for k in bus_shunts)
 
-    constraint_power_balance(pm, nw, i, bus_arcs, bus_arcs_pst, bus_convs_ac, bus_arcs_sw, bus_gens, bus_storage, bus_pd, bus_qd, bus_gs, bus_bs)
+    constraint_power_balance_ac(pm, nw, i, bus_arcs, bus_arcs_pst, bus_convs_ac, bus_arcs_sw, bus_gens, bus_storage, bus_loads, bus_gs, bus_bs)
+end
+
+
+function constraint_total_flexible_demand(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    load     = _PM.ref(pm, nw, :load, i)
+    pd       = load["pd"]
+    pf_angle = _FP.get(load, "pf_angle", 0.0) # Power factor angle, in radians
+    constraint_total_flexible_demand(pm, nw, i, pd, pf_angle)
 end

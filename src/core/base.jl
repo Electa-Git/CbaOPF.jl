@@ -18,3 +18,14 @@ function ref_add_pst!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
         nw_ref[:bus_arcs_pst] = bus_arcs_pst
     end
 end
+
+
+"Add to `ref` the keys for handling flexible demand"
+function ref_add_flex_load!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
+    for (n, nw_ref) in ref[:it][_PM.pm_it_sym][:nw]
+        # Loads that can be made flexible, depending on investment decision
+        nw_ref[:flex_load] = Dict(x for x in nw_ref[:load] if x.second["flex"] == 1)
+        # Loads that are not flexible and do not have an associated investment decision
+        nw_ref[:fixed_load] = Dict(x for x in nw_ref[:load] if x.second["flex"] == 0)
+    end
+end

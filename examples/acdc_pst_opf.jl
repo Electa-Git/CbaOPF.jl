@@ -17,4 +17,10 @@ gurobi = JuMP.optimizer_with_attributes(Gurobi.Optimizer)
 
 s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true)
 resultAC = CBAOPF.solve_cbaopf(file, _PM.ACPPowerModel, ipopt; setting = s)
-resultDC = CBAOPF.solve_cbaopf(file, _PM.DCPPowerModel, ipopt; setting = s)
+resultDC = CBAOPF.solve_cbaopf(file, _PM.DCPPowerModel, gurobi; setting = s)
+
+
+data = PowerModels.parse_file(file)
+_PMACDC.process_additional_data!(data)
+CBAOPF.add_flexible_demand_data!(data)
+CBAOPF.process_pst_data!(data)
