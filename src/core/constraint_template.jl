@@ -2,8 +2,8 @@
 # Constraint templates
 function constraint_ohms_y_from_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
-    f_bus = pst["fbus"]
-    t_bus = pst["tbus"]
+    f_bus = pst["f_bus"]
+    t_bus = pst["t_bus"]
     f_idx = (i, f_bus, t_bus)
     t_idx = (i, t_bus, f_bus)
 
@@ -16,8 +16,8 @@ end
 
 function constraint_ohms_y_to_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
-    f_bus = pst["fbus"]
-    t_bus = pst["tbus"]
+    f_bus = pst["f_bus"]
+    t_bus = pst["t_bus"]
     f_idx = (i, f_bus, t_bus)
     t_idx = (i, t_bus, f_bus)
 

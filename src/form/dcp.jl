@@ -22,12 +22,12 @@ function constraint_ohms_y_to_pst(pm::_PM.AbstractDCPModel, n::Int, i::Int, f_bu
 
 function constraint_limits_pst(pm::_PM.AbstractDCPModel, i::Int; nw::Int=_PM.nw_id_default)
     pst = _PM.ref(pm, nw, :pst, i)
-    srated = pst["rateA"]
+    srated = pst["rate_a"]
     angmin = pst["angmin"]
     angmax = pst["angmax"]
 
-    f_bus = pst["fbus"]
-    t_bus = pst["tbus"]
+    f_bus = pst["f_bus"]
+    t_bus = pst["t_bus"]
     f_idx = (i, f_bus, t_bus)
     t_idx = (i, t_bus, f_bus)
 

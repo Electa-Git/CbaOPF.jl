@@ -15,8 +15,8 @@ function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     if bounded
         for arc in _PM.ref(pm, nw, :arcs_pst)
             l,i,j = arc
-                JuMP.set_lower_bound(p[arc], -_PM.ref(pm, nw, :pst, l)["rateA"])
-                JuMP.set_upper_bound(p[arc], _PM.ref(pm, nw, :pst, l)["rateA"])
+                JuMP.set_lower_bound(p[arc], -_PM.ref(pm, nw, :pst, l)["rate_a"])
+                JuMP.set_upper_bound(p[arc], _PM.ref(pm, nw, :pst, l)["rate_a"])
         end
     end
 
@@ -33,8 +33,8 @@ function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_i
     if bounded
         for arc in _PM.ref(pm, nw, :arcs_pst)
             l,i,j = arc
-                JuMP.set_lower_bound(q[arc], -_PM.ref(pm, nw, :pst, l)["rateA"])
-                JuMP.set_upper_bound(q[arc], _PM.ref(pm, nw, :pst, l)["rateA"])
+                JuMP.set_lower_bound(q[arc], -_PM.ref(pm, nw, :pst, l)["rate_a"])
+                JuMP.set_upper_bound(q[arc], _PM.ref(pm, nw, :pst, l)["rate_a"])
         end
     end
 
