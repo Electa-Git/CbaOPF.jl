@@ -70,4 +70,15 @@ function build_cbaopf(pm::_PM.AbstractPowerModel)
     for i in _PM.ids(pm, :flex_load)
         constraint_total_flexible_demand(pm, i)
     end
+
+    if pm.setting["fix_cross_border_flows"] == true
+        if !haskey(pm.setting, "borders")
+            borders = [i for i in _PM.ids(pm, :borders)]
+        else
+            borders = [i for i in pm.setting["borders"]]
+        end
+        for i in borders
+            constraint_fixed_xb_flows(pm, i)
+        end
+    end
 end
