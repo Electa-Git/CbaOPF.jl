@@ -58,7 +58,36 @@ end
 
 
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
-    _FP.variable_total_flex_demand(pm; kwargs...)
+    variable_total_flex_demand(pm; kwargs...)
     _FP.variable_demand_reduction(pm; kwargs...)
     _FP.variable_demand_curtailment(pm; kwargs...)
+end
+
+
+function variable_total_flex_demand(pm::_PM.AbstractPowerModel; kwargs...)
+    variable_total_flex_demand_active(pm; kwargs...)
+    variable_total_flex_demand_reactive(pm; kwargs...)
+end
+
+"Variable for the actual (flexible) real load demand at each load point and each time step"
+function variable_total_flex_demand_active(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    pflex = _PM.var(pm, nw)[:pflex] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :load)], base_name="$(nw)_pflex",
+        lower_bound = 0,
+        upper_bound = _PM.ref(pm, nw, :load, i, "pd"),
+        start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "pd")
+    )
+    report && _PM.sol_component_value(pm, nw, :load, :pflex, _PM.ids(pm, nw, :load), pflex)
+end
+
+function variable_total_flex_demand_reactive(pm::_PM.AbstractActivePowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+end
+
+"Variable for the actual (flexible) reactive load demand at each load point and each time step"
+function variable_total_flex_demand_reactive(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    qflex = _PM.var(pm, nw)[:qflex] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :load)], base_name="$(nw)_qflex",
+        start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "qd")
+    )
+    report && _PM.sol_component_value(pm, nw, :load, :qflex, _PM.ids(pm, nw, :load), qflex)
 end
