@@ -59,8 +59,8 @@ end
 
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
     variable_total_flex_demand(pm; kwargs...)
-    _FP.variable_demand_reduction(pm; kwargs...)
-    _FP.variable_demand_curtailment(pm; kwargs...)
+    variable_demand_reduction(pm; kwargs...)
+    variable_demand_curtailment(pm; kwargs...)
 end
 
 
@@ -73,8 +73,8 @@ end
 function variable_total_flex_demand_active(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     pflex = _PM.var(pm, nw)[:pflex] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :load)], base_name="$(nw)_pflex",
-        lower_bound = 0,
-        upper_bound = _PM.ref(pm, nw, :load, i, "pd"),
+        lower_bound = min(0, _PM.ref(pm, nw, :load, i, "pd")),
+        upper_bound = max(0, _PM.ref(pm, nw, :load, i, "pd")),
         start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "pd")
     )
     report && _PM.sol_component_value(pm, nw, :load, :pflex, _PM.ids(pm, nw, :load), pflex)
@@ -90,4 +90,29 @@ function variable_total_flex_demand_reactive(pm::_PM.AbstractPowerModel; nw::Int
         start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "qd")
     )
     report && _PM.sol_component_value(pm, nw, :load, :qflex, _PM.ids(pm, nw, :load), qflex)
+end
+
+
+"Variable for the power not consumed (voluntary load reduction) at each flex load point and each time step"
+function variable_demand_reduction(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    pred = _PM.var(pm, nw)[:pred] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :flex_load)], base_name="$(nw)_pred",
+        lower_bound = 0,
+        upper_bound = max(0, _PM.ref(pm, nw, :load, i, "pd")) * _PM.ref(pm, nw, :flex_load, i, "pred_rel_max"),
+        start = 0
+    )
+    if report
+        _PM.sol_component_value(pm, nw, :load, :pred, _PM.ids(pm, nw, :flex_load), pred)
+    end
+end
+
+"Variable for load curtailment (i.e. involuntary demand reduction) at each load point and each time step"
+function variable_demand_curtailment(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    pcurt = _PM.var(pm, nw)[:pcurt] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :load)], base_name="$(nw)_pcurt",
+        lower_bound = 0,
+        upper_bound = max(0, _PM.ref(pm, nw, :load, i, "pd")),
+        start = 0
+    )
+    report && _PM.sol_component_value(pm, nw, :load, :pcurt, _PM.ids(pm, nw, :load), pcurt)
 end

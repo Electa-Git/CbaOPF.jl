@@ -67,7 +67,6 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_
             push!(arcs_xb_lines, (line["index"],  line["t_bus"], line["f_bus"] ))
         end
     end
-    print(arcs_xb_lines,"\n")
     
     flow = _PM.ref(pm, nw, :borders, i, "flow")
 
