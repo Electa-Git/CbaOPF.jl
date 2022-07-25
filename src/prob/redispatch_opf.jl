@@ -6,7 +6,7 @@ function solve_rdopf(file::String, model_type::Type, optimizer; kwargs...)
     return _PM.solve_model(data, model_type, optimizer, build_rdopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!, ref_add_flex_load!], kwargs...)
 end
 
-function solve_cbaopf(data::Dict{String,Any}, model_type::Type, optimizer; kwargs...)
+function solve_rdopf(data::Dict{String,Any}, model_type::Type, optimizer; kwargs...)
     return _PM.solve_model(data, model_type, optimizer, build_rdopf; ref_extensions = [_PMACDC.add_ref_dcgrid!, ref_add_pst!, ref_add_flex_load!], kwargs...)
 end
 

@@ -15,6 +15,7 @@ const _FP = FlexPlan
 const _LOGGER = Memento.getlogger(@__MODULE__)
 
 include("prob/cba_opf.jl")
+include("prob/redispatch_opf.jl")
 # include("prob/cba_opf_mn.jl")
 
 include("core/variable.jl")
