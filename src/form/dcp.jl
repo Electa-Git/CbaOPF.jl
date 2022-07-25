@@ -90,3 +90,13 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractDCPModel, n::Int, xb_lines, x
         JuMP.@constraint(pm.model,  (1 - slack) * flow >= sum(p[a] for a in xb_lines) - sum(pconv[c] for c in xb_convs))
     end
 end
+
+
+function constraint_gen_redispatch(pm::_PM.AbstractDCPModel, n::Int, i, pg_ref)
+    pg       = _PM.var(pm, n, :pg, i)
+    dpg_up   = _PM.var(pm, n, :dpg_up, i)
+    dpg_down = _PM.var(pm, n, :dpg_down, i)
+
+    # Starting from the reference dispatch pg_ref, the new dispatch point is pg == pg_ref + dpg_up - dpg_down
+    JuMP.@constraint(pm.model, pg == pg_ref + dpg_up - dpg_down)
+end

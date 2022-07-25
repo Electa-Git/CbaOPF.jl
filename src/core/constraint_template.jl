@@ -82,3 +82,10 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_
 
     constraint_fixed_xb_flows(pm, nw, arcs_xb_lines, xb_convs, flow)
 end
+
+
+function constraint_gen_redispatch(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    gen     = _PM.ref(pm, nw, :gen, i)
+    pg_ref       = gen["pg"]
+    constraint_gen_redispatch(pm, nw, i, pg_ref)
+end

@@ -65,3 +65,24 @@ function calc_load_operational_cost(pm::_PM.AbstractPowerModel; n::Int=_PM.nw_id
     end
     return cost
 end
+
+
+function objective_min_rd_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
+    gen_cost = Dict()
+
+    for (n, nw_ref) in _PM.nws(pm)
+        for (i,gen) in nw_ref[:gen]
+            dpg_up = sum( _PM.var(pm, n, :dpg_up, i)[c] for c in _PM.conductor_ids(pm, n) )
+            dpg_down = sum( _PM.var(pm, n, :dpg_down, i)[c] for c in _PM.conductor_ids(pm, n) )
+            gen_cost[(n,i)] = gen["rdcost_up"][1] * dpg_up +  gen["rdcost_down"][1] * dpg_down
+        end
+    end
+
+    return JuMP.@objective(pm.model, Min,
+        sum(
+            sum(    gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] )
+        for (n, nw_ref) in _PM.nws(pm))
+        
+        + calc_load_operational_cost(pm)
+    )
+end
