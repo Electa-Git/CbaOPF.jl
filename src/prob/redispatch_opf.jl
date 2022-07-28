@@ -75,7 +75,6 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
         constraint_total_flexible_demand(pm, i)
     end
 
-
     for i in _PM.ids(pm, :gen)
         constraint_gen_redispatch(pm, i)
     end
@@ -89,5 +88,9 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
         for i in borders
             constraint_fixed_xb_flows(pm, i)
         end
+    end
+
+    if haskey(pm.setting, "inertia_limit") && pm.setting["inertia_limit"] == true
+        constraint_inertia_limit(pm)
     end
 end

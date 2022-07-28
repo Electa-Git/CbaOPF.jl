@@ -84,8 +84,22 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_
 end
 
 
-function constraint_gen_redispatch(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+function constraint_gen_redispatch(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     gen     = _PM.ref(pm, nw, :gen, i)
     pg_ref  = gen["pg"]
     constraint_gen_redispatch(pm, nw, i, pg_ref)
+end
+
+
+function constraint_inertia_limit(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    inertia_limit = _PM.ref(pm, nw, :inertia_limit)
+    
+    gen_inertia = Dict()
+    for (n, nw_ref) in _PM.nws(pm)
+        for (i,gen) in nw_ref[:gen]
+            gen_inertia[(n,i)] = gen["inertia_constants"]
+        end
+    end
+
+    constraint_inertia_limit(pm, nw, gen_inertia, inertia_limit)
 end
