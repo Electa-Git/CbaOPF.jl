@@ -91,13 +91,13 @@ function constraint_gen_redispatch(pm::_PM.AbstractPowerModel, i::Int; nw::Int =
 end
 
 
-function constraint_inertia_limit(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
-    inertia_limit = _PM.ref(pm, nw, :inertia_limit)
-    
+function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    inertia_limit = _PM.ref(pm, nw, :inertia_limit, i)["limit"]
+
     gen_inertia = Dict()
-    for (n, nw_ref) in _PM.nws(pm)
-        for (i,gen) in nw_ref[:gen]
-            gen_inertia[(n,i)] = gen["inertia_constants"]
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if gen["zone"] == i
+            push!(gen_inertia, g => gen["inertia_constants"])
         end
     end
 

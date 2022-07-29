@@ -91,6 +91,10 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
     end
 
     if haskey(pm.setting, "inertia_limit") && pm.setting["inertia_limit"] == true
-        constraint_inertia_limit(pm)
+        zones = [i for i in _PM.ids(pm, :inertia_limit)]
+        print(zones)
+        for i in zones
+            constraint_inertia_limit(pm, i)
+        end
     end
 end
