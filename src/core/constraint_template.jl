@@ -101,5 +101,12 @@ function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = 
         end
     end
 
-    constraint_inertia_limit(pm, nw, gen_inertia, inertia_limit)
+    conv_inertia = Dict()
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "zone") && conv["zone"] == i
+            push!(conv_inertia, c => conv["inertia_constants"])
+        end
+    end
+
+    constraint_inertia_limit(pm, nw, gen_inertia, conv_inertia, inertia_limit)
 end
