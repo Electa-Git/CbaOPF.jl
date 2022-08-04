@@ -100,3 +100,13 @@ function constraint_gen_redispatch(pm::_PM.AbstractDCPModel, n::Int, i, pg_ref)
     # Starting from the reference dispatch pg_ref, the new dispatch point is pg == pg_ref + dpg_up - dpg_down
     JuMP.@constraint(pm.model, pg == pg_ref + dpg_up - dpg_down)
 end
+
+
+function constraint_generator_on_off(pm::_PM.AbstractDCPModel, n::Int, i, pmax, pmin, status)
+    pg = _PM.var(pm, n, :pg, i)
+    alpha_g = _PM.var(pm, n, :alpha_g, i)
+
+    JuMP.@constraint(pm.model,  pg <= pmax * alpha_g)
+    JuMP.@constraint(pm.model,  pg >= pmin * alpha_g)
+    JuMP.@constraint(pm.model,  alpha_g >= status)
+end

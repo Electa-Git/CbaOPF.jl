@@ -144,3 +144,13 @@ function variable_redispacth_down(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     )
     report && _PM.sol_component_value(pm, nw, :gen, :dpg_down, _PM.ids(pm, nw, :gen), dpg_down)
 end
+
+"Variable for upwards generator redispatch each time step"
+function variable_generator_state(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    alpha_g = _PM.var(pm, nw)[:alpha_g] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_alpha_g",
+        binary = true,
+        start = 0
+    )
+    report && _PM.sol_component_value(pm, nw, :gen, :alpha_g, _PM.ids(pm, nw, :gen), alpha_g)
+end

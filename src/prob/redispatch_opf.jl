@@ -28,7 +28,15 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
     variable_flexible_demand(pm)
     variable_gen_redispatch(pm)
 
-    objective_min_rd_cost(pm)
+    if haskey(pm.setting, "inertia_limit") && pm.setting["inertia_limit"] == true
+        variable_generator_state(pm)
+    end
+
+    if haskey(pm.setting, "inertia_limit") && pm.setting["inertia_limit"] == true
+        objective_min_rd_cost_inertia(pm)
+    else
+        objective_min_rd_cost(pm)
+    end
 
     for i in _PM.ids(pm, :ref_buses)
         _PM.constraint_theta_ref(pm, i)
@@ -76,7 +84,11 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
     end
 
     for i in _PM.ids(pm, :gen)
-        constraint_gen_redispatch(pm, i)
+        if haskey(pm.setting, "inertia_limit") && pm.setting["inertia_limit"] == true
+            constraint_generator_on_off(pm, i)
+        else
+            constraint_gen_redispatch(pm, i)
+        end
     end
 
     if pm.setting["fix_cross_border_flows"] == true

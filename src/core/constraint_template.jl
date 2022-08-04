@@ -94,19 +94,28 @@ end
 function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     inertia_limit = _PM.ref(pm, nw, :inertia_limit, i)["limit"]
 
-    gen_inertia = Dict()
+    generator_properties = Dict()
     for (g, gen) in _PM.ref(pm, nw, :gen)
         if gen["zone"] == i
-            push!(gen_inertia, g => gen["inertia_constants"])
+            push!(generator_properties, g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
         end
     end
 
-    conv_inertia = Dict()
-    for (c, conv) in _PM.ref(pm, nw, :convdc)
-        if haskey(conv, "zone") && conv["zone"] == i
-            push!(conv_inertia, c => conv["inertia_constants"])
-        end
-    end
+    constraint_inertia_limit(pm, nw, generator_properties, inertia_limit)
 
-    constraint_inertia_limit(pm, nw, gen_inertia, conv_inertia, inertia_limit)
+    # conv_inertia = Dict()
+    # for (c, conv) in _PM.ref(pm, nw, :convdc)
+    #     if haskey(conv, "zone") && conv["zone"] == i
+    #         push!(conv_inertia, c => conv["inertia_constants"])
+    #     end
+    # end
+end
+
+function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    gen     = _PM.ref(pm, nw, :gen, i)
+    pmax = gen["pmax"]
+    pmin = gen["pmin"]
+    status = gen["dispatch_status"]
+
+    constraint_generator_on_off(pm, nw, i, pmax, pmin, status)
 end
