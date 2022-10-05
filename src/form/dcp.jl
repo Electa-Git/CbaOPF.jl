@@ -70,7 +70,7 @@ function constraint_total_flexible_demand(pm::_PM.AbstractDCPModel, n::Int, i, p
 end
 
 
-function constraint_fixed_xb_flows(pm::_PM.AbstractDCPModel, n::Int, xb_lines, xb_convs, flow)
+function constraint_fixed_xb_flows(pm::_PM.AbstractDCPModel, n::Int, xb_lines, xb_convs, flow, slack)
     p    = _PM.var(pm, n, :p)
     pconv = _PM.var(pm, n,  :pconv_tf_fr)
 
@@ -81,7 +81,6 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractDCPModel, n::Int, xb_lines, x
     # flow > 0 means export
     # flow < 0 means import
     
-    slack = 0.0
     if flow > 0  # in case of import
         JuMP.@constraint(pm.model, sum(p[a] for a in xb_lines) - sum(pconv[c] for c in xb_convs) <= (1 + slack) * flow)
         JuMP.@constraint(pm.model,  (1 - slack) * flow <= sum(p[a] for a in xb_lines) - sum(pconv[c] for c in xb_convs))

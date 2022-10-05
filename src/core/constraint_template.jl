@@ -60,6 +60,7 @@ end
 function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     xb_line_dict = _PM.ref(pm, nw, :borders, i, "xb_lines")
     xb_conv_dict = _PM.ref(pm, nw, :borders, i, "xb_convs")
+    slack = _PM.ref(pm, nw, :borders, i, "slack")
     arcs_xb_lines = []
     xb_convs = []
     for (k, line) in xb_line_dict
@@ -80,7 +81,7 @@ function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_
     
     flow = _PM.ref(pm, nw, :borders, i, "flow")
 
-    constraint_fixed_xb_flows(pm, nw, arcs_xb_lines, xb_convs, flow)
+    constraint_fixed_xb_flows(pm, nw, arcs_xb_lines, xb_convs, flow, slack)
 end
 
 
@@ -96,7 +97,7 @@ function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = 
 
     generator_properties = Dict()
     for (g, gen) in _PM.ref(pm, nw, :gen)
-        if gen["zone"] == i
+        if haskey(gen, "zone") && gen["zone"] == i && haskey(gen, "inertia_constants")
             push!(generator_properties, g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
         end
     end
