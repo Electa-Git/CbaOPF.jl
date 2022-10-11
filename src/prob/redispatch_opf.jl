@@ -68,8 +68,8 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
         if pm.ref[:it][:pm][:nw][_PM.nw_id_default][:convdc][i]["islcc"] == 1
             _PMACDC.constraint_conv_firing_angle(pm, i)
         end
-        if !haskey(pm.setting, "fix_converter_setpoints") && pm.setting["fix_converter_setpoints"] == true
-            _PMACDC.constraint_active_conv_setpoint(pm, i)
+        if haskey(pm.setting, "fix_converter_setpoints") && pm.setting["fix_converter_setpoints"] == true
+            constraint_active_conv_setpoint(pm, i)
         end
     end
 

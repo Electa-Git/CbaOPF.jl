@@ -120,3 +120,9 @@ function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int
 
     constraint_generator_on_off(pm, nw, i, pmax, pmin, status)
 end
+
+function constraint_active_conv_setpoint(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    conv = _PM.ref(pm, nw, :convdc, i)
+    
+    constraint_active_conv_setpoint(pm, nw, conv["index"], conv["P_g"])
+end
