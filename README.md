@@ -2,6 +2,13 @@
 
 A julia package based on PowerModels.jl, PowerModelsACDC.jl and FlexPlan.jl created to solve the AC/DC grid OPF calculations for CBA purposes. The package contains besides the classical AC/DC OPF also an optimisation of PST angles, demand response and load-shedding.
 
+Following problem types are implemented:
+
+- Economic dispatch model (network flow model) with inertia constraints per zone
+- AC/DC grid OPF model with optimisation of HVDC converter set points, PST angles, demand response and load-shedding 
+- Redispatch cost minimization for fixed and variable HVDC converter set points
+- Start-up cost minimisation considering minimum inertia constraints
+
 ## How to use?
 
 Add the package to your working environment using:

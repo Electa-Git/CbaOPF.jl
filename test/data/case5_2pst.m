@@ -42,7 +42,7 @@ mpc.gencost = [
 ];
 
 %% branch data
-%	fbus	tbus	r	x	b	rateA	rateB	rateC	ratio	angle	status	angmin	angmax
+%	fbus	tbus	r	x	b	rate_a	rate_b	rate_c	ratio	angle	status	angmin	angmax
 mpc.branch = [
 1	 2	 0.00281	 0.0281	 0.00712	 400.0	 400.0	 400.0	 0.0	  0.0	 1	 -30.0	 30.0;
 1	 4	 0.00304	 0.0304	 0.00658	 426	 426	 426	 0.0	  0.0	 1	 -30.0	 30.0;
@@ -54,7 +54,7 @@ mpc.branch = [
 ];
 
 %% pst data
-%column_names%	fbus	tbus	br_r	br_x	br_b	rateA	rateB	rateC	angle	status	angmin	angmax
+%column_names%	f_bus	t_bus	br_r	br_x	br_b	rateA	rateB	rateC	angle	br_status	angmin	angmax
 mpc.pst = [
 	6	 3	 0.00097	 0.0097	 0.0	 426.0	 426.0	 426.0	  0.0	 1	 -30	 30;
 	7	 4	 0.00097	 0.0097	 0.0	 426.0	 426.0	 426.0	  0.0	 1	 -30	 30;
