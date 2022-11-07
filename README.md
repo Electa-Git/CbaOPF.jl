@@ -41,7 +41,7 @@ import JuMP
 import HiGHS  # needs startvalues for all variables!
 
 
-# Load test dile
+# Load test file
 file = "./test/data/case5_acdc_pst_3_grids.m"
 
 # Define solvers
@@ -59,8 +59,8 @@ _PMACDC.process_additional_data!(data)
 CBAOPF.add_flexible_demand_data!(data)
 # Process PST data
 CBAOPF.process_pst_data!(data)
-# Process cross border flow data
-CBAOPF.prepare_data!(data, borders)
+# Process generator and cross border flow data
+CBAOPF.prepare_data!(data, borders = borders)
 
 
 # Provide addtional settings as part of the PowerModels settings dictionary
@@ -103,6 +103,27 @@ resultRD_inertia = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting 
 # we inspect the results
 print([gen["alpha_g"] for (g, gen) in resultRD_inertia["solution"]["gen"]] .- [gen["dispatch_status"] for (g, gen) in dataRD["gen"]],"\n")
 print(resultRD_inertia["objective"], "\n")
+
+
+###############  CASE 4: NTC based network flow model using zonal inertia constraints
+
+# Load test file
+file = "./test/data/case5_2_grids.m"
+inertia_limit = Dict(1 => Dict("limit" => 12), 2 => Dict("limit" => 10))
+# Parse file using PowerModels
+data = PowerModels.parse_file(file)
+# Add inertia limit to the data
+data["inertia_limit"] = inertia_limit
+# Process generator data
+CBAOPF.prepare_data!(data)
+
+s = Dict("output" => Dict("branch_flows" => true), "inertia_limit" => false)
+resultOPF_zonal_no_limit =  CBAOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
+
+s = Dict("output" => Dict("branch_flows" => true), "inertia_limit" => true)
+resultOPF_zonal_with_limit =  CBAOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
+
+print("Cost difference through inertia constraint: ", resultOPF_zonal_with_limit["objective"] - resultOPF_zonal_no_limit["objective"], "\n")
 ```
 
 ## Developed by:

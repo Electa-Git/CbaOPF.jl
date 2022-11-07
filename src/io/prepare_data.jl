@@ -1,6 +1,9 @@
-function prepare_data!(data, borders)
+function prepare_data!(data; borders = nothing)
     prepare_generator_data!(data)
-    find_and_assign_xb_lines!(data, borders)
+
+    if !isnothing(borders)
+        find_and_assign_xb_lines!(data, borders)
+    end
 
     return data
 end
