@@ -27,7 +27,7 @@ resultDC = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, lp_solver; setting = s)
 
 where ```data``` is a PowerModels(ACDC) dictionary.
 
-A sample script to run the OPF is given below, which uses an m-file (see test folder) as input:
+A sample script to run the OPF is given below, which uses an m-file (see folder examples) as input:
 
 ```julia
 import PowerModelsACDC
@@ -38,22 +38,71 @@ import CBAOPF
 import Ipopt
 import Memento
 import JuMP
-import Gurobi  # needs startvalues for all variables!
+import HiGHS  # needs startvalues for all variables!
 
-file = "./test/data/case5_acdc_pst.m"
 
-ipopt = JuMP.optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6, "print_level" => 0)
-gurobi = JuMP.optimizer_with_attributes(Gurobi.Optimizer)
+# Load test dile
+file = "./test/data/case5_acdc_pst_3_grids.m"
 
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true)
+# Define solvers
+ipopt = JuMP.optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6)
+highs = JuMP.optimizer_with_attributes(HiGHS.Optimizer)
 
+# define nodes 13 & 14 of grid three as cross-border nodes (outside zone) with a dedicated flow of 200 MW in total (e.g. 2 pu), define some slack by which XB flows can deviate
+borders = Dict(1 => Dict("xb_nodes" => [13 14], "flow" => 2, "slack" => 0))
+
+# Parse file using PowerModels
 data = PowerModels.parse_file(file)
+# Process DC grid data
 _PMACDC.process_additional_data!(data)
+# Process demand reduction and curtailment data
 CBAOPF.add_flexible_demand_data!(data)
+# Process PST data
 CBAOPF.process_pst_data!(data)
+# Process cross border flow data
+CBAOPF.prepare_data!(data, borders)
 
-resultAC = CBAOPF.solve_cbaopf(data, _PM.ACPPowerModel, ipopt; setting = s)
-resultDC = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, gurobi; setting = s)
+
+# Provide addtional settings as part of the PowerModels settings dictionary
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true)
+
+############ CASE 1: OPF problem ###############
+
+# Let us run the CBA OPF with the objective of minimizinf total generation, demand recution and load shedding cost.
+resultOPF = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, highs; setting = s)
+
+############ CASE 2: Redispacth minimization problem ###############
+
+# Let us deactivate a line (branch 5) and run the redispatch minimisation problem
+contingency = 1
+# we define a redispatch cost factor of 2, e.g. redispatch cost = 2 * dispatch cost
+rd_cost_factor = 2
+# Write OPF solution as starting point to the redispatch minimisation problem
+dataRD = CBAOPF.prepare_redispatch_data(resultOPF, data; contingency = contingency, rd_cost_factor = rd_cost_factor)
+# Provide settings for the optimisation problem, here we fix the HVDC converter set points
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
+# Run optimisation problem
+resultRD_no_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+# Now we allow the HVDC converter set points to be determined optimally
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
+resultRD_with_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+# Print the difference between both costs
+print("Redispatch cost difference: ",  resultRD_no_control["objective"] - resultRD_with_control["objective"], "\n")
+
+############ CASE 3: Inertia constrained start-up cost minimisation ####################
+
+# we define inertia limits for zone 1, which cannot be achoeved without additional generation start-up
+# the online generation in zone 1 is 13.3 pu (pmax), and the inertia constraint is determined as \sum(pmax) = limit / 0.9, thus a limit of 14.8 pu.*seconnds causes the start-up of generator 4
+inertia_limit = Dict(1 => Dict("limit" => 14.8), 2 => Dict("limit" => 0), 3 => Dict("limit" => 0))
+# we write the OPF results into the input data
+dataRD = CBAOPF.prepare_redispatch_data(resultOPF, data; inertia_limit = inertia_limit)
+# we update settings to include the inertia constraints
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
+#we perform the optimisation
+resultRD_inertia = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+# we inspect the results
+print([gen["alpha_g"] for (g, gen) in resultRD_inertia["solution"]["gen"]] .- [gen["dispatch_status"] for (g, gen) in dataRD["gen"]],"\n")
+print(resultRD_inertia["objective"], "\n")
 ```
 
 ## Developed by:
