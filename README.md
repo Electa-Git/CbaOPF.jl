@@ -1,3 +1,9 @@
+Status:
+[![CI](https://github.com/Electa-Git/CBAOPF.jl/workflows/CI/badge.svg)](https://github.com/Electa-Git/CBAOPF.jl/actions?query=workflow%3ACI)
+<a href="https://codecov.io/gh/Electa-Git/CBAOPF.jl"><img src="https://img.shields.io/codecov/c/github/Electa-Git/CBAOPF.jl?logo=Codecov"></img></a>
+
+
+
 # CBAOPF.jl
 
 A julia package based on PowerModels.jl, PowerModelsACDC.jl and FlexPlan.jl created to solve the AC/DC grid OPF calculations for CBA purposes. The package contains besides the classical AC/DC OPF also an optimisation of PST angles, demand response and load-shedding.
