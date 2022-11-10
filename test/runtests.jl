@@ -16,7 +16,7 @@ Memento.setlevel!(Memento.getlogger(_PM), "error")
 using Test
 
 include("prepare_test_data.jl")
-data = prepare_test_data!("./test/data/case5_acdc_pst_3_grids.m")
+data = prepare_test_data!("../test/data/case5_acdc_pst_3_grids.m")
 
 @testset "CBAOPF" begin
 
