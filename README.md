@@ -132,6 +132,10 @@ resultOPF_zonal_with_limit =  CBAOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerM
 print("Cost difference through inertia constraint: ", resultOPF_zonal_with_limit["objective"] - resultOPF_zonal_no_limit["objective"], "\n")
 ```
 
+## Acknowledgement:
+This software implementation is performed in the framework of the study "AC/DC hybrid grid modelling enabling a high share of renewables", a project performed for the European Commission under contract N° ENER/2021/OP/0008-B5/SER/2020-563/SI2.864123 
+
+
 ## Developed by:
 
 Hakan Ergun - KU Leuven / EnergyVille
