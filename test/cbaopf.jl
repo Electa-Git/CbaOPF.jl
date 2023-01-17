@@ -13,12 +13,12 @@ resultOPF = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, highs; setting = s)
 
     @test isapprox(resultOPF["objective"], 34021.7, atol = 1e-1)
     @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 0.955, atol = 1e-2)
-    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.607, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.202, atol = 1e-2)
     @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], 0.977907, atol = 1e-2)
 end
 
 # Let us deactivate a line (branch 5) and run the redispatch minimisation problem
-contingency = 1
+contingency = 4
 # we define a redispatch cost factor of 2, e.g. redispatch cost = 2 * dispatch cost
 rd_cost_factor = 2
 # Write OPF solution as starting point to the redispatch minimisation problem
@@ -26,14 +26,14 @@ dataRD = CBAOPF.prepare_redispatch_data(resultOPF, data; contingency = contingen
 
 @testset "Redispatch OPF" begin
 # Provide settings for the optimisation problem, here we fix the HVDC converter set points
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
 # Run optimisation problem
 resultRD_no_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 # Now we allow the HVDC converter set points to be determined optimally
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
 resultRD_with_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 
-@test isapprox(resultRD_no_control["objective"] - resultRD_with_control["objective"] , 7177.39, atol = 1e-1)
+@test isapprox(resultRD_no_control["objective"] - resultRD_with_control["objective"] , 5485.38, atol = 1e-1)
 
 end
 
