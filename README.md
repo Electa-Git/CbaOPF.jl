@@ -20,7 +20,7 @@ Following problem types are implemented:
 Add the package to your working environment using:
 
 ```julia
-] develop https://github.com/Electa-Git/CBAOPF.jl.git
+] add CBAOPF
 ```
 
 You can run the OPF in AC or DC formulation using the command:
