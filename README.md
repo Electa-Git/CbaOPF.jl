@@ -4,7 +4,7 @@ Status:
 
 
 
-# CBAOPF.jl
+# CbaOPF.jl
 
 A julia package based on PowerModels.jl, PowerModelsACDC.jl and FlexPlan.jl created to solve the AC/DC grid OPF calculations for CBA purposes. The package contains besides the classical AC/DC OPF also an optimisation of PST angles, demand response and load-shedding.
 
@@ -20,7 +20,7 @@ Following problem types are implemented:
 Add the package to your working environment using:
 
 ```julia
-] add CBAOPF
+] add CbaOPF
 ```
 
 You can run the OPF in AC or DC formulation using the command:
