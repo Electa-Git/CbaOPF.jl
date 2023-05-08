@@ -1,4 +1,4 @@
-module CBAOPF
+module CbaOPF
 
 # import Compat
 import JuMP

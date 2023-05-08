@@ -1,6 +1,6 @@
 Status:
-[![CI](https://github.com/Electa-Git/CBAOPF.jl/workflows/CI/badge.svg)](https://github.com/Electa-Git/CBAOPF.jl/actions?query=workflow%3ACI)
-<a href="https://codecov.io/gh/Electa-Git/CBAOPF.jl"><img src="https://img.shields.io/codecov/c/github/Electa-Git/CBAOPF.jl?logo=Codecov"></img></a>
+[![CI](https://github.com/Electa-Git/CbaOPF.jl/workflows/CI/badge.svg)](https://github.com/Electa-Git/CbaOPF.jl/actions?query=workflow%3ACI)
+<a href="https://codecov.io/gh/Electa-Git/CbaOPF.jl"><img src="https://img.shields.io/codecov/c/github/Electa-Git/CbaOPF.jl?logo=Codecov"></img></a>
 
 
 
@@ -27,8 +27,8 @@ You can run the OPF in AC or DC formulation using the command:
 
 ```julia
 s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true)
-resultAC = CBAOPF.solve_cbaopf(data, _PM.ACPPowerModel, nlp_solver; setting = s)
-resultDC = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, lp_solver; setting = s)
+resultAC = CbaOPF.solve_cbaopf(data, _PM.ACPPowerModel, nlp_solver; setting = s)
+resultDC = CbaOPF.solve_cbaopf(data, _PM.DCPPowerModel, lp_solver; setting = s)
 ```
 
 where ```data``` is a PowerModels(ACDC) dictionary.
@@ -40,7 +40,7 @@ import PowerModelsACDC
 const _PMACDC = PowerModelsACDC
 import PowerModels
 const _PM = PowerModels
-import CBAOPF
+import CbaOPF
 import Ipopt
 import Memento
 import JuMP
@@ -62,11 +62,11 @@ data = PowerModels.parse_file(file)
 # Process DC grid data
 _PMACDC.process_additional_data!(data)
 # Process demand reduction and curtailment data
-CBAOPF.add_flexible_demand_data!(data)
+CbaOPF.add_flexible_demand_data!(data)
 # Process PST data
-CBAOPF.process_pst_data!(data)
+CbaOPF.process_pst_data!(data)
 # Process generator and cross border flow data
-CBAOPF.prepare_data!(data, borders = borders)
+CbaOPF.prepare_data!(data, borders = borders)
 
 
 # Provide addtional settings as part of the PowerModels settings dictionary
@@ -75,7 +75,7 @@ s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fi
 ############ CASE 1: OPF problem ###############
 
 # Let us run the CBA OPF with the objective of minimizinf total generation, demand recution and load shedding cost.
-resultOPF = CBAOPF.solve_cbaopf(data, _PM.DCPPowerModel, highs; setting = s)
+resultOPF = CbaOPF.solve_cbaopf(data, _PM.DCPPowerModel, highs; setting = s)
 
 ############ CASE 2: Redispacth minimization problem ###############
 
@@ -84,14 +84,14 @@ contingency = 1
 # we define a redispatch cost factor of 2, e.g. redispatch cost = 2 * dispatch cost
 rd_cost_factor = 2
 # Write OPF solution as starting point to the redispatch minimisation problem
-dataRD = CBAOPF.prepare_redispatch_data(resultOPF, data; contingency = contingency, rd_cost_factor = rd_cost_factor)
+dataRD = CbaOPF.prepare_redispatch_data(resultOPF, data; contingency = contingency, rd_cost_factor = rd_cost_factor)
 # Provide settings for the optimisation problem, here we fix the HVDC converter set points
 s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
 # Run optimisation problem
-resultRD_no_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+resultRD_no_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 # Now we allow the HVDC converter set points to be determined optimally
 s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
-resultRD_with_control = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+resultRD_with_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 # Print the difference between both costs
 print("Redispatch cost difference: ",  resultRD_no_control["objective"] - resultRD_with_control["objective"], "\n")
 
@@ -101,11 +101,11 @@ print("Redispatch cost difference: ",  resultRD_no_control["objective"] - result
 # the online generation in zone 1 is 13.3 pu (pmax), and the inertia constraint is determined as \sum(pmax) = limit / 0.9, thus a limit of 14.8 pu.*seconnds causes the start-up of generator 4
 inertia_limit = Dict(1 => Dict("limit" => 14.8), 2 => Dict("limit" => 0), 3 => Dict("limit" => 0))
 # we write the OPF results into the input data
-dataRD = CBAOPF.prepare_redispatch_data(resultOPF, data; inertia_limit = inertia_limit)
+dataRD = CbaOPF.prepare_redispatch_data(resultOPF, data; inertia_limit = inertia_limit)
 # we update settings to include the inertia constraints
 s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
 #we perform the optimisation
-resultRD_inertia = CBAOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
+resultRD_inertia = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 # we inspect the results
 print([gen["alpha_g"] for (g, gen) in resultRD_inertia["solution"]["gen"]] .- [gen["dispatch_status"] for (g, gen) in dataRD["gen"]],"\n")
 print(resultRD_inertia["objective"], "\n")
@@ -121,13 +121,13 @@ data = PowerModels.parse_file(file)
 # Add inertia limit to the data
 data["inertia_limit"] = inertia_limit
 # Process generator data
-CBAOPF.prepare_data!(data)
+CbaOPF.prepare_data!(data)
 
 s = Dict("output" => Dict("branch_flows" => true), "inertia_limit" => false)
-resultOPF_zonal_no_limit =  CBAOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
+resultOPF_zonal_no_limit =  CbaOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
 
 s = Dict("output" => Dict("branch_flows" => true), "inertia_limit" => true)
-resultOPF_zonal_with_limit =  CBAOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
+resultOPF_zonal_with_limit =  CbaOPF.solve_zonal_inertia_opf(data, _PM.NFAPowerModel, highs; setting = s) 
 
 print("Cost difference through inertia constraint: ", resultOPF_zonal_with_limit["objective"] - resultOPF_zonal_no_limit["objective"], "\n")
 ```
