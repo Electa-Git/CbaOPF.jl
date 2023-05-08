@@ -8,11 +8,11 @@ data = PowerModels.parse_file(file)
 # Process DC grid data
 _PMACDC.process_additional_data!(data)
 # Process demand reduction and curtailment data
-CBAOPF.add_flexible_demand_data!(data)
+CbaOPF.add_flexible_demand_data!(data)
 # Process PST data
-CBAOPF.process_pst_data!(data)
+CbaOPF.process_pst_data!(data)
 # Process generator and cross border flow data
-CBAOPF.prepare_data!(data, borders = borders)
+CbaOPF.prepare_data!(data, borders = borders)
 
 return data
 
