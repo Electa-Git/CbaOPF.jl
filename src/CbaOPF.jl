@@ -27,6 +27,7 @@ include("core/objective.jl")
 
 include("form/acp.jl")
 include("form/dcp.jl")
+include("form/lpac.jl")
 
 include("io/prepare_data.jl")
 

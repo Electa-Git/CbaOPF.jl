@@ -56,7 +56,6 @@ function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_defaul
     report && _PM.sol_component_value(pm, nw, :pst, :alpha, _PM.ids(pm, nw, :pst), alpha)
 end
 
-
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
     variable_total_flex_demand(pm; kwargs...)
     variable_demand_reduction(pm; kwargs...)
