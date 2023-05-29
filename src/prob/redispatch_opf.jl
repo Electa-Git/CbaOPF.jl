@@ -91,7 +91,7 @@ function build_rdopf(pm::_PM.AbstractPowerModel)
         end
     end
 
-    if pm.setting["fix_cross_border_flows"] == true
+    if haskey(pm.setting, "fix_cross_border_flows") && pm.setting["fix_cross_border_flows"] == true
         if !haskey(pm.setting, "borders")
             borders = [i for i in _PM.ids(pm, :borders)]
         else

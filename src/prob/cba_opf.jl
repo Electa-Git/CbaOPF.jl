@@ -61,18 +61,13 @@ function build_cbaopf(pm::_PM.AbstractPowerModel)
         end
     end
 
-    
-    for i in _PM.ids(pm, :pst)
-        constraint_ohms_y_from_pst(pm, i)
-        constraint_ohms_y_to_pst(pm, i)
-        constraint_limits_pst(pm, i)
-    end
+    pst_constraints(pm)
 
     for i in _PM.ids(pm, :flex_load)
         constraint_total_flexible_demand(pm, i)
     end
 
-    if pm.setting["fix_cross_border_flows"] == true
+    if haskey(pm.setting, "fix_cross_border_flows") && pm.setting["fix_cross_border_flows"] == true
         if !haskey(pm.setting, "borders")
             borders = [i for i in _PM.ids(pm, :borders)]
         else
@@ -82,4 +77,16 @@ function build_cbaopf(pm::_PM.AbstractPowerModel)
             constraint_fixed_xb_flows(pm, i)
         end
     end
+end
+
+function pst_constraints(pm::_PM.AbstractPowerModel)
+    for i in _PM.ids(pm, :pst)
+        constraint_ohms_y_from_pst(pm, i)
+        constraint_ohms_y_to_pst(pm, i)
+        constraint_limits_pst(pm, i)
+    end
+end
+
+function pst_constraints(pm::_PM.AbstractWModels)
+    print("PSTs not yet defined for SOC formulations", "\n")
 end
