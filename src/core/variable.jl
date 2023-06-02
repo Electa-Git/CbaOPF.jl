@@ -153,3 +153,74 @@ function variable_generator_state(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     )
     report && _PM.sol_component_value(pm, nw, :gen, :alpha_g, _PM.ids(pm, nw, :gen), alpha_g)
 end
+
+"Variable for the variable NTC capacity"
+function variable_branch_capacity(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    delta_cap = _PM.var(pm, nw)[:delta_cap] = JuMP.@variable(pm.model,
+        [b in _PM.ids(pm, nw, :branch)], base_name="$(nw)_delta_cap",
+        start = 0
+    )
+
+    if bounded
+        for (b, branch) in _PM.ref(pm, nw, :branch)
+            JuMP.set_lower_bound(delta_cap[b], 0)
+            JuMP.set_upper_bound(delta_cap[b], branch["delta_cap_max"])
+        end
+    end
+
+    report && _PM.sol_component_value(pm, nw, :branch, :delta_cap, _PM.ids(pm, nw, :branch), delta_cap)
+end
+
+function variable_storage(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
+    variable_storage_charging_power(pm, nw = nw)
+    variable_storage_discharging_power(pm, nw = nw)
+    variable_storage_net_power(pm, nw = nw)
+    variable_storage_energy_content(pm, nw = nw)
+end
+
+
+"Variable for storage charging"
+function variable_storage_charging_power(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    ps_ch = _PM.var(pm, nw)[:ps_ch] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :storage_simple)], base_name="$(nw)_ps_ch",
+        lower_bound = 0,
+        upper_bound = max(0, _PM.ref(pm, nw, :storage_simple, i, "charge_rating")),
+        start = 0
+    )
+    report && _PM.sol_component_value(pm, nw, :storage_simple, :ps_ch, _PM.ids(pm, nw, :storage_simple), ps_ch)
+end
+
+"Variable for storage discharging"
+function variable_storage_discharging_power(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    ps_dch = _PM.var(pm, nw)[:ps_dch] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :storage_simple)], base_name="$(nw)_ps_dch",
+        lower_bound = 0,
+        upper_bound = max(0, _PM.ref(pm, nw, :storage_simple, i, "discharge_rating")),
+        start = 0
+    )
+    report && _PM.sol_component_value(pm, nw, :storage_simple, :ps_dch, _PM.ids(pm, nw, :storage_simple), ps_dch)
+end
+
+"Variable for net storage injection"
+function variable_storage_net_power(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    ps = _PM.var(pm, nw)[:ps] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :storage_simple)], base_name="$(nw)_ps",
+        lower_bound = -max(0, _PM.ref(pm, nw, :storage_simple, i, "charge_rating")),
+        upper_bound =  max(0, _PM.ref(pm, nw, :storage_simple, i, "discharge_rating")),
+        start = 0
+    )
+    report && _PM.sol_component_value(pm, nw, :storage_simple, :ps, _PM.ids(pm, nw, :storage_simple), ps)
+end
+
+
+"Variable storage energy content"
+function variable_storage_energy_content(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    es = _PM.var(pm, nw)[:es] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :storage_simple)], base_name="$(nw)_es",
+    lower_bound = 0,
+    upper_bound = max(0, _PM.ref(pm, nw, :storage_simple, i, "energy_rating")),
+    start = _PM.ref(pm, nw, :storage_simple, i, "energy")
+    )
+
+    report && _PM.sol_component_value(pm, nw, :storage_simple, :es, _PM.ids(pm, nw, :storage_simple), es)
+end

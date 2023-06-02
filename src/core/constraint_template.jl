@@ -126,3 +126,71 @@ function constraint_active_conv_setpoint(pm::_PM.AbstractPowerModel, i::Int; nw:
     
     constraint_active_conv_setpoint(pm, nw, conv["index"], conv["P_g"])
 end
+
+function constraint_variable_ntc_from(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    branch = _PM.ref(pm, nw, :branch, i)
+    f_bus = branch["f_bus"]
+    t_bus = branch["t_bus"]
+    f_idx = (i, f_bus, t_bus)
+
+    pmax = branch["rate_a"]
+
+    constraint_variable_ntc_from(pm, nw, f_idx, pmax)
+end
+
+function constraint_variable_ntc_to(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    branch = _PM.ref(pm, nw, :branch, i)
+    f_bus = branch["f_bus"]
+    t_bus = branch["t_bus"]
+    t_idx = (i, t_bus, f_bus)
+
+    pmax = branch["rate_a"]
+
+    constraint_variable_ntc_to(pm, nw, t_idx, pmax)
+end
+
+function constraint_ntc_capacity(pm::_PM.AbstractAPLossLessModels, i::Int; nw::Int=_PM.nw_id_default)
+    n = nw
+    n_1 = n - 1
+
+    constraint_ntc_capacity(pm, i, n, n_1)
+end
+
+
+# Constraint template for the energy content, e.g. state of charge of storage
+function constraint_storage_state(pm::_PM.AbstractPowerModel, i::Int; nw::Int=nw_id_default)
+    storage = _PM.ref(pm, nw, :storage_simple, i)
+
+    if haskey(_PM.ref(pm, nw), :time_elapsed)
+        time_elapsed = _PM.ref(pm, nw, :time_elapsed)
+    else
+        Memento.warn(_LOGGER, "network data should specify time_elapsed, using 1.0 as a default")
+        time_elapsed = 1.0
+    end
+
+    constraint_storage_state(pm, nw, i, storage["charge_efficiency"], storage["discharge_efficiency"], time_elapsed)
+end
+
+# Constraint template for the energy content, e.g. state of charge of storage, in the first hour
+function constraint_storage_initial_state(pm::_PM.AbstractPowerModel, i::Int; nw::Int=nw_id_default)
+    storage = _PM.ref(pm, nw, :storage_simple, i)
+
+    if haskey(_PM.ref(pm, nw), :time_elapsed)
+        time_elapsed = _PM.ref(pm, nw, :time_elapsed)
+    else
+        Memento.warn(_LOGGER, "network data should specify time_elapsed, using 1.0 as a default")
+        time_elapsed = 1.0
+    end
+
+    constraint_storage_initial_state(pm, nw, i, storage["energy"], storage["charge_efficiency"], storage["discharge_efficiency"], time_elapsed)
+end
+
+# Constraint template for AC nodes power balance
+function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, i::Int; nw::Int=_PM.nw_id_default)
+    bus_arcs = _PM.ref(pm, nw, :bus_arcs, i)
+    bus_gens = _PM.ref(pm, nw, :bus_gens, i)
+    bus_loads = _PM.ref(pm, nw, :bus_loads, i)
+    bus_storage = _PM.ref(pm, nw, :bus_storage, i)
+
+    constraint_power_balance(pm, nw, i, bus_arcs, bus_gens, bus_loads, bus_storage)
+end

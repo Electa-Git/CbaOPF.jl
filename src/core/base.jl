@@ -29,3 +29,16 @@ function ref_add_flex_load!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
         nw_ref[:fixed_load] = Dict(x for x in nw_ref[:load] if x.second["flex"] == 0)
     end
 end
+
+"Add simplified storage model to reference"
+function ref_add_storage!(ref::Dict{Symbol,Any}, data::Dict{String,<:Any})
+    for (nw, nw_ref) in ref[:it][:pm][:nw]
+        nw_ref[:storage_simple] = Dict(x for x in nw_ref[:storage_simple] if (x.second["status"] == 1 && x.second["storage_bus"] in keys(nw_ref[:bus])))
+
+        bus_storage = Dict((i, Int[]) for (i,bus) in nw_ref[:bus])
+        for (i, strg) in nw_ref[:storage_simple]
+            push!(bus_storage[strg["storage_bus"]], i)
+        end
+        nw_ref[:bus_storage] = bus_storage
+    end
+end

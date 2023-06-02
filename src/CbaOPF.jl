@@ -17,6 +17,7 @@ const _LOGGER = Memento.getlogger(@__MODULE__)
 include("prob/cba_opf.jl")
 include("prob/redispatch_opf.jl")
 include("prob/zonal_inertia_constrained_opf.jl")
+include("prob/zonal_tnep.jl")
 
 include("core/variable.jl")
 include("core/base.jl")
@@ -29,6 +30,7 @@ include("form/acp.jl")
 include("form/dcp.jl")
 include("form/lpac.jl")
 include("form/wr.jl")
+include("form/nf.jl")
 
 include("io/prepare_data.jl")
 

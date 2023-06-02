@@ -25,8 +25,81 @@ end
 
 ""
 function _objective_min_fuel_cost_polynomial_linquad(pm::_PM.AbstractPowerModel; report::Bool=true)
+   
+    gen_cost = calc_gen_cost(pm)
+    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+    )
+end
+
+function objective_min_rd_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
     gen_cost = Dict()
 
+    for (n, nw_ref) in _PM.nws(pm)
+        for (i,gen) in nw_ref[:gen]
+            dpg_up = sum( _PM.var(pm, n, :dpg_up, i)[c] for c in _PM.conductor_ids(pm, n) )
+            dpg_down = sum( _PM.var(pm, n, :dpg_down, i)[c] for c in _PM.conductor_ids(pm, n) )
+            gen_cost[(n,i)] = gen["rdcost_up"][1] * dpg_up +  gen["rdcost_down"][1] * dpg_down
+        end
+    end
+
+    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] ) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+    )
+end
+
+
+function objective_min_rd_cost_inertia(pm::_PM.AbstractPowerModel; report::Bool=true)
+    gen_cost = Dict()
+
+    for (n, nw_ref) in _PM.nws(pm)
+        for (i,gen) in nw_ref[:gen]
+            alpha_g =  _PM.var(pm, n, :alpha_g, i)
+            gen_cost[(n,i)] = (alpha_g - gen["dispatch_status"]) * gen["start_up_cost"] * gen["pmax"] #+  (1 - alpha_g) * gen["rdcost_down"][1] * dpg_down
+        end
+    end
+
+    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm)) 
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+    )
+end
+
+
+function objective_min_fuel_and_capex_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
+    gen_cost = calc_gen_cost(pm)
+    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+   
+    branch_cost = Dict()
+    for (n, nw_ref) in _PM.nws(pm)
+        for (b,branch) in nw_ref[:branch]
+            Δcap = sum( _PM.var(pm, n, :delta_cap, b)[c] for c in _PM.conductor_ids(pm, n) )
+            branch_cost[(n,b)] = branch["capacity_cost"] * Δcap
+        end
+    end
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] ) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( branch_cost[(n,b)] for (b,branch) in nw_ref[:branch]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+    )
+end
+
+
+function calc_gen_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
+    gen_cost = Dict()
     for (n, nw_ref) in _PM.nws(pm)
         for (i,gen) in nw_ref[:gen]
             pg = sum( _PM.var(pm, n, :pg, i)[c] for c in _PM.conductor_ids(pm, n) )
@@ -42,67 +115,20 @@ function _objective_min_fuel_cost_polynomial_linquad(pm::_PM.AbstractPowerModel;
             end
         end
     end
-
-    return JuMP.@objective(pm.model, Min,
-        sum(
-            sum(    gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] )
-        for (n, nw_ref) in _PM.nws(pm))
-        
-        + calc_load_operational_cost(pm)
-    )
+    return gen_cost
 end
 
-
-function calc_load_operational_cost(pm::_PM.AbstractPowerModel; n::Int=_PM.nw_id_default)
-    cost = 0.0
-    flex_load = _PM.ref(pm, n, :flex_load)
-    if !isempty(flex_load)
-        cost += sum(
-            + l["cost_red"] * _PM.var(pm, n, :pred, i)
-            + l["cost_curt"] * _PM.var(pm, n, :pcurt, i)
-            for (i,l) in flex_load
-        )
-    end
-    return cost
-end
-
-
-function objective_min_rd_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
-    gen_cost = Dict()
-
+function calc_load_operational_cost(pm::_PM.AbstractPowerModel)
+    load_cost_red = Dict()
+    load_cost_curt = Dict()
     for (n, nw_ref) in _PM.nws(pm)
-        for (i,gen) in nw_ref[:gen]
-            dpg_up = sum( _PM.var(pm, n, :dpg_up, i)[c] for c in _PM.conductor_ids(pm, n) )
-            dpg_down = sum( _PM.var(pm, n, :dpg_down, i)[c] for c in _PM.conductor_ids(pm, n) )
-            gen_cost[(n,i)] = gen["rdcost_up"][1] * dpg_up +  gen["rdcost_down"][1] * dpg_down
+        for (l, load) in nw_ref[:load]
+            p_red = sum( _PM.var(pm, n, :pred, l)[c] for c in _PM.conductor_ids(pm, n) )
+            p_curt = sum( _PM.var(pm, n, :pcurt, l)[c] for c in _PM.conductor_ids(pm, n) )
+            load_cost_red[n, l] = load["cost_red"]  * p_red
+            load_cost_curt[n, l] = load["cost_curt"] * p_curt
         end
     end
 
-    return JuMP.@objective(pm.model, Min,
-        sum(
-            sum(    gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] )
-        for (n, nw_ref) in _PM.nws(pm))
-        
-        + calc_load_operational_cost(pm)
-    )
-end
-
-
-function objective_min_rd_cost_inertia(pm::_PM.AbstractPowerModel; report::Bool=true)
-    gen_cost = Dict()
-
-    for (n, nw_ref) in _PM.nws(pm)
-        for (i,gen) in nw_ref[:gen]
-            alpha_g =  _PM.var(pm, n, :alpha_g, i)
-            gen_cost[(n,i)] = (alpha_g - gen["dispatch_status"]) * gen["start_up_cost"] * gen["pmax"] #+  (1 - alpha_g) * gen["rdcost_down"][1] * dpg_down
-        end
-    end
-
-    return JuMP.@objective(pm.model, Min,
-        sum(
-            sum(    gen_cost[(n,i)] for (i,gen) in nw_ref[:gen] )
-        for (n, nw_ref) in _PM.nws(pm))
-        
-        + calc_load_operational_cost(pm)
-    )
+    return load_cost_red, load_cost_curt
 end
