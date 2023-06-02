@@ -22,6 +22,7 @@ function fix_data_single_network_pst!(data)
         pst["b_fr"] = 0
         pst["g_to"] = 0
         pst["b_to"] = 0
+        pst["tap"] = 1.0
     end
 end
 function to_pu_multi_network_pst!(data)
@@ -41,6 +42,7 @@ function fix_data_multi_network_pst!(data)
             pst["b_fr"] = 0
             pst["g_to"] = 0
             pst["b_to"] = 0
+            pst["tap"] = 1.0
         end
     end
 end

@@ -54,25 +54,25 @@ function constraint_ohms_y_from_pst(pm::_PM.AbstractLPACModel, n::Int, i::Int, f
     phi_to = _PM.var(pm, n, :phi, t_bus)
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
-    cs = _PM.var(pm, n, :cs, f_bus)
+    cs = _PM.var(pm, n, :cs_pst, (f_bus, t_bus))
 
-    JuMP.@constraint(model, p_fr ==  g * (1.0 + 2*phi_fr) - g * (cs + phi_fr + phi_to) - b * (va_fr - va_to - alpha))
-    JuMP.@constraint(model, q_fr == -b * (1.0 + 2*phi_fr) + b * (cs + phi_fr + phi_to) - g * (va_fr - va_to - alpha))
+    JuMP.@constraint(pm.model, p_fr ==  g * (1.0 + 2*phi_fr) - g * (cs + phi_fr + phi_to) - b * (va_fr - va_to - alpha))
+    JuMP.@constraint(pm.model, q_fr == -b * (1.0 + 2*phi_fr) + b * (cs + phi_fr + phi_to) - g * (va_fr - va_to - alpha))
 end
 
 function constraint_ohms_y_to_pst(pm::_PM.AbstractLPACModel, n::Int, i::Int, f_bus, t_bus, f_idx, t_idx, g, b, g_fr, b_fr)
     alpha = _PM.var(pm, n,  :psta, i)
-    p_fr  = _PM.var(pm, n,  :ppst, f_idx)
-    q_fr  = _PM.var(pm, n,  :qpst, f_idx)
+    p_to  = _PM.var(pm, n,  :ppst, t_idx)
+    q_to  = _PM.var(pm, n,  :qpst, t_idx)
 
     phi_fr = _PM.var(pm, n, :phi, f_bus)
     phi_to = _PM.var(pm, n, :phi, t_bus)
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
-    cs = _PM.var(pm, n, :cs, t_bus)
+    cs = _PM.var(pm, n, :cs_pst, (f_bus, t_bus))
 
-    JuMP.@constraint(model, p_to ==  g * (1.0 + 2 * phi_to) - g * (cs + phi_fr + phi_to) -b * (va_to - va_fr + alpha))
-    JuMP.@constraint(model, q_to == -b * (1.0 + 2 * phi_to) + b * (cs + phi_fr + phi_to) -g * (va_to - va_fr + alpha))
+    JuMP.@constraint(pm.model, p_to ==  g * (1.0 + 2 * phi_to) - g * (cs + phi_fr + phi_to) -b * (va_to - va_fr + alpha))
+    JuMP.@constraint(pm.model, q_to == -b * (1.0 + 2 * phi_to) + b * (cs + phi_fr + phi_to) -g * (va_to - va_fr + alpha))
 end
 
 

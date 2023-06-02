@@ -88,12 +88,12 @@ resultOPF = CbaOPF.solve_cbaopf(data, _PM.SOCWRPowerModel, ipopt; setting = s)
     @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], -0.005477, atol = 1e-2)
 end
 
-# resultOPF = CbaOPF.solve_cbaopf(data_ac, _PM.LPACCPowerModel, highs; setting = s)
+resultOPF = CbaOPF.solve_cbaopf(data, _PM.LPACCPowerModel, ipopt; setting = s)
 
-# @testset  "Nodal LPACC - CBA OPF" begin
+@testset  "Nodal LPACC - CBA OPF" begin
 
-#     @test isapprox(resultOPF["objective"], 3113.2, atol = 1e-1)
-#     @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 0, atol = 1e-2)
-#     @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -0.0074, atol = 1e-2)
-#     @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], -0.005477, atol = 1e-2)
-# end
+    @test isapprox(resultOPF["objective"],  24519.2, atol = 1e-1)
+    @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 1.15441, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.75847, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], 0.831186, atol = 1e-2)
+end

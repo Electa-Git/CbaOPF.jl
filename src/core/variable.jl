@@ -3,6 +3,7 @@ function variable_pst(pm; kwargs...)
     variable_active_pst_flow(pm, kwargs...)
     variable_reactive_pst_flow(pm, kwargs...)
     variable_pst_angle(pm, kwargs...)
+    variable_pst_cosine(pm, kwargs...)
 end
 
 "variable: `p[l,i,j]` for `(l,i,j)` in `arcs`"
@@ -55,6 +56,44 @@ function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_defaul
     end
     report && _PM.sol_component_value(pm, nw, :pst, :alpha, _PM.ids(pm, nw, :pst), alpha)
 end
+
+function variable_pst_cosine(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+end
+
+function variable_pst_cosine(pm::_PM.LPACCPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    cs_pst = _PM.var(pm, nw)[:cs_pst] = JuMP.@variable(pm.model,
+        [bp in _PM.ids(pm, nw, :buspairs_pst)], base_name="$(nw)_cs",
+        start = _PM.comp_start_value(_PM.ref(pm, nw, :buspairs_pst, bp), "cs_start", 1.0)
+    )
+
+    if bounded
+        for (bp, buspair) in _PM.ref(pm, nw, :buspairs_pst)
+            angmin = buspair["angmin"]
+            angmax = buspair["angmax"]
+            if angmin >= 0
+                cos_max = cos(angmin)
+                cos_min = cos(angmax)
+            end
+            if angmax <= 0
+                cos_max = cos(angmax)
+                cos_min = cos(angmin)
+            end
+            if angmin < 0 && angmax > 0
+                cos_max = 1.0
+                cos_min = min(cos(angmin), cos(angmax))
+            end
+
+            JuMP.set_lower_bound(cs_pst[bp], cos_min)
+            JuMP.set_upper_bound(cs_pst[bp], cos_max)
+        end
+    end
+
+    report && _PM.sol_component_value_buspair(pm, nw, :buspairs_pst, :cs_pst, _PM.ids(pm, nw, :buspairs_pst), cs_pst)
+end
+
+
+
+
 
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
     variable_total_flex_demand(pm; kwargs...)
