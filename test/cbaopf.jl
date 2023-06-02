@@ -61,3 +61,39 @@ s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fi
     @test isapprox(result["solution"]["gen"]["8"]["alpha_g"] - dataRD["gen"]["8"]["dispatch_status"], 0.0, atol = 1e-3)
     @test isapprox(result["objective"], 800.0, atol = 1e-2)
 end
+
+
+#### AC OPF problem
+
+# Provide addtional settings as part of the PowerModels settings dictionary
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => false)
+
+############ OPF problem ###############
+resultOPF = CbaOPF.solve_cbaopf(data, _PM.ACPPowerModel, ipopt; setting = s)
+
+@testset  "Nodal AC - CBA OPF" begin
+
+    @test isapprox(resultOPF["objective"], 24715.7, atol = 1e-1)
+    @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 1.205709, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.70106, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], 0.80970, atol = 1e-2)
+end
+
+resultOPF = CbaOPF.solve_cbaopf(data, _PM.SOCWRPowerModel, ipopt; setting = s)
+
+@testset  "Nodal SOC - CBA OPF" begin
+    @test isapprox(resultOPF["objective"], 3113.2, atol = 1e-1)
+    @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 0, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -0.0074, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], -0.005477, atol = 1e-2)
+end
+
+# resultOPF = CbaOPF.solve_cbaopf(data_ac, _PM.LPACCPowerModel, highs; setting = s)
+
+# @testset  "Nodal LPACC - CBA OPF" begin
+
+#     @test isapprox(resultOPF["objective"], 3113.2, atol = 1e-1)
+#     @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 0, atol = 1e-2)
+#     @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -0.0074, atol = 1e-2)
+#     @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], -0.005477, atol = 1e-2)
+# end
