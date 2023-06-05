@@ -72,3 +72,18 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, n::Int, i::I
         _PM.sol(pm, n, :bus, i)[:lam_kcl_r] = cstr_p
     end
 end
+
+function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, gcont, ΔT, f0, fmin)
+    ΔPg = _PM.var(pm, 1, :pg)[gcont]
+    alpha_g = _PM.var(pm, n, :alpha_g)
+    print(gcont, "\n")
+    cf = JuMP.@constraint(pm.model, sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (f0 - fmin)) >= f0 * ΔPg *  ΔT)
+    print(cf, "\n")
+end
+
+function constraint_generator_status(pm::_PM.AbstractPowerModel, n::Int, i::Int)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    alpha_n_1 = _PM.var(pm, n-1, :alpha_g, i)
+
+    JuMP.@constraint(pm.model, alpha_n == alpha_n_1)
+end

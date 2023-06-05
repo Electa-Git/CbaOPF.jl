@@ -90,3 +90,19 @@ function add_flexible_demand_data!(data)
     delete!(data, "load_extra")
     return data
 end
+
+
+function create_generator_contingencies(data)
+    number_of_contingencies = length(data["gen"]) + 1
+    gen_keys = sort(parse.(Int, collect(keys(data["gen"]))))
+    mn_data = _IM.replicate(data, number_of_contingencies, Set{String}(["source_type", "name", "source_version", "per_unit"]))
+
+    for idx in 1:length(gen_keys)+1
+        if idx == 1
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing)
+        else
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1])
+        end
+    end
+    return mn_data
+end

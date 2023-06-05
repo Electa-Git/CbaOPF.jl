@@ -112,13 +112,21 @@ function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = 
     # end
 end
 
-function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default, use_status = true)
     gen     = _PM.ref(pm, nw, :gen, i)
     pmax = gen["pmax"]
     pmin = gen["pmin"]
-    status = gen["dispatch_status"]
+    if use_status == true
+        status = gen["dispatch_status"]
+    else
+        status = 0
+    end
 
     constraint_generator_on_off(pm, nw, i, pmax, pmin, status)
+end
+
+function constraint_generator_status(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    constraint_generator_status(pm, nw, i)
 end
 
 function constraint_active_conv_setpoint(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
@@ -193,4 +201,29 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, i::Int; nw::
     bus_storage = _PM.ref(pm, nw, :bus_storage, i)
 
     constraint_power_balance(pm, nw, i, bus_arcs, bus_gens, bus_loads, bus_storage)
+end
+
+
+function constraint_frequency(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
+    generator_properties = Dict()
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if haskey(gen, "zone") && gen["zone"] == i && haskey(gen, "inertia_constants")
+            if g != gcont
+                push!(generator_properties, g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+            else
+                push!(generator_properties, g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+            end
+        end
+    end
+
+    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+    ΔT = frequency_parameters["t_fcr"]
+    fmin = frequency_parameters["fmin"]
+    f0 = frequency_parameters["f0"]
+
+
+    if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
+        constraint_frequency(pm, nw, generator_properties, gcont, ΔT, f0, fmin)
+    end
 end

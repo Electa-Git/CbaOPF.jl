@@ -77,6 +77,27 @@ function objective_min_rd_cost_inertia(pm::_PM.AbstractPowerModel; report::Bool=
 end
 
 
+
+function objective_min_cost_frequency(pm::_PM.AbstractPowerModel; report::Bool=true)
+    gen_cost = Dict()
+
+    for (n, nw_ref) in _PM.nws(pm)
+        for (i,gen) in nw_ref[:gen]
+            alpha_g =  _PM.var(pm, n, :alpha_g, i)
+            pg =  _PM.var(pm, n, :pg, i)
+            gen_cost[(n,i)] = (alpha_g * gen["start_up_cost"] * gen["pmax"]) + (gen["cost"][1]*pg + gen["cost"][2])  #+  (1 - alpha_g) * gen["rdcost_down"][1] * dpg_down
+        end
+    end
+
+    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm)) 
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+    )
+end
+
 function objective_min_fuel_and_capex_cost(pm::_PM.AbstractPowerModel; report::Bool=true)
     gen_cost = calc_gen_cost(pm)
     load_cost_red, load_cost_curt = calc_load_operational_cost(pm)

@@ -1,12 +1,12 @@
 # PST variables
-function variable_pst(pm; kwargs...)
-    variable_active_pst_flow(pm, kwargs...)
-    variable_reactive_pst_flow(pm, kwargs...)
-    variable_pst_angle(pm, kwargs...)
-    variable_pst_cosine(pm, kwargs...)
+function variable_pst(pm::_PM.AbstractPowerModel; kwargs...)
+    variable_active_pst_flow(pm; kwargs...)
+    variable_reactive_pst_flow(pm; kwargs...)
+    variable_pst_angle(pm; kwargs...)
+    variable_pst_cosine(pm; kwargs...)
 end
 
-"variable: `p[l,i,j]` for `(l,i,j)` in `arcs`"
+"variable: `p[l,i,j]` for `(l,i,j)` in `pst_arcs`"
 function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     p = _PM.var(pm, nw)[:ppst] = JuMP.@variable(pm.model,
         [(l,i,j) in _PM.ref(pm, nw, :arcs_pst)], base_name="$(nw)_ppst",
@@ -24,7 +24,7 @@ function variable_active_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     report && _PM.sol_component_value_edge(pm, nw, :pst, :pf, :pt, _PM.ref(pm, nw, :arcs_from_pst), _PM.ref(pm, nw, :arcs_to_pst), p)
 end
 
-"variable: `q[l,i,j]` for `(l,i,j)` in `arcs`"
+"variable: `q[l,i,j]` for `(l,i,j)` in `pst_arcs`"
 function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     q = _PM.var(pm, nw)[:qpst] = JuMP.@variable(pm.model,
         [(l,i,j) in _PM.ref(pm, nw, :arcs_pst)], base_name="$(nw)_qpst",
@@ -42,7 +42,7 @@ function variable_reactive_pst_flow(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_i
     report && _PM.sol_component_value_edge(pm, nw, :pst, :qf, :qt, _PM.ref(pm, nw, :arcs_from_pst), _PM.ref(pm, nw, :arcs_to_pst), q)
 end
 
-"variable: `t[i]` for `i` in `bus`es"
+"variable: psta[i] for PSTs"
 function variable_pst_angle(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     alpha = _PM.var(pm, nw)[:psta] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :pst)], base_name="$(nw)_psta",
@@ -90,10 +90,6 @@ function variable_pst_cosine(pm::_PM.LPACCPowerModel; nw::Int=_PM.nw_id_default,
 
     report && _PM.sol_component_value_buspair(pm, nw, :buspairs_pst, :cs_pst, _PM.ids(pm, nw, :buspairs_pst), cs_pst)
 end
-
-
-
-
 
 function variable_flexible_demand(pm::_PM.AbstractPowerModel; kwargs...)
     variable_total_flex_demand(pm; kwargs...)
