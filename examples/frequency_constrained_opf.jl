@@ -17,7 +17,7 @@ file_dc = "./test/data/case5_2grids_inertia_hvdc.m"
 ipopt = JuMP.optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6)
 gurobi = JuMP.optimizer_with_attributes(Gurobi.Optimizer)
 # Parse file using PowerModels
-data = PowerModels.parse_file(file_ac)
+data = PowerModels.parse_file(file_dc)
 # Process demand reduction and curtailment data
 CbaOPF.add_flexible_demand_data!(data)
 # Process inertia data
@@ -31,8 +31,9 @@ if !haskey(data, "convdc")
 end
 # Add frequency stability data
 data["frequency_parameters"] = Dict{String, Any}()
-data["frequency_parameters"]["fmin"] = 49
-data["frequency_parameters"]["f0"] = 50
+data["frequency_parameters"]["fmin"] = 49.3
+data["frequency_parameters"]["fmax"] = 50.0
+data["frequency_parameters"]["f0"] = 50.0
 data["frequency_parameters"]["t_fcr"] = 0.2
 # Add generator contingencies
 mn_data = CbaOPF.create_generator_contingencies(data)
@@ -43,19 +44,20 @@ s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hv
 
 result = CbaOPF.solve_fsopf(mn_data, _PM.DCPPowerModel, gurobi, setting = s, multinetwork = true)
 
-h_tot = [0.0 0.0]
-for (g, gen) in result["solution"]["nw"]["1"]["gen"]
-    zone = mn_data["nw"]["1"]["gen"][g]["zone"]
-    h = mn_data["nw"]["1"]["gen"][g]["pmax"] *  mn_data["nw"]["1"]["gen"][g]["inertia_constants"] * gen["alpha_g"]
-    h_tot[zone] = h + h_tot[zone] 
-end
-
-for idx in 1:2
-    for (g, gen) in result["solution"]["nw"]["1"]["gen"]
-        if data["gen"][g]["zone"] == idx
-            h = h_tot[idx] - data["gen"][g]["inertia_constants"]
-            Δf = gen["alpha_g"] * gen["pg"] * data["frequency_parameters"]["f0"] * data["frequency_parameters"]["t_fcr"] / (2 * h)
-            print(g, " ", gen["pg"], " ",Δf, "\n")
+contingencies = sort(parse.(Int, collect(keys(result["solution"]["nw"]))))[2:end]
+for c in contingencies
+    c_res = result["solution"]["nw"]["$c"]
+    gen_id = mn_data["nw"]["$c"]["contingency"]["gen_id"]
+    ΔPg = result["solution"]["nw"]["1"]["gen"]["$gen_id"]["pg"] * result["solution"]["nw"]["1"]["gen"]["$gen_id"]["alpha_g"] 
+    f0 = mn_data["nw"]["1"]["frequency_parameters"]["f0"]
+    ΔT = mn_data["nw"]["1"]["frequency_parameters"]["t_fcr"]
+    for (z, zone) in c_res["zones"]
+        if  mn_data["nw"]["1"]["gen"]["$gen_id"]["zone"] == parse(Int, z)
+            f =  f0 * (1 - (ΔPg * ΔT - zone["dc_contr"]) / (2 * zone["htot"]))
+        else 
+            f =  f0 * (1 + (zone["dc_contr"]) / (2 * zone["htot"]))
         end
+
+        print("Contingency of generator ", gen_id, " of ", ΔPg*100 ," MW, -> f in zone ", z, " = ", f, " Hz", "\n")
     end
 end

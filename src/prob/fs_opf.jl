@@ -21,6 +21,8 @@ function build_fsopf(pm::_PM.AbstractPowerModel)
         variable_generator_state(pm; nw = n)
         variable_pst(pm; nw = n)
         variable_converter_inertia(pm; nw = n)
+        variable_inertia(pm; nw = n)
+        variable_hvdc_contribution(pm; nw = n)
     end
 
     network_ids = sort(collect(_PM.nw_ids(pm)))

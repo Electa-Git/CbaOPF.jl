@@ -276,3 +276,37 @@ function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_i
 
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in, _PM.ids(pm, nw, :convdc), Δpconv)
 end
+
+"Variable to inspect total inertia"
+function variable_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    htot = _PM.var(pm, nw)[:htot] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_htot",
+    start = 0.0
+    )
+
+    if bounded
+        for (z, zone) in _PM.ref(pm, nw, :zones)
+            JuMP.set_lower_bound(htot[z],   0.0)
+            JuMP.set_upper_bound(htot[z],   1e6)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :zones, :htot, _PM.ids(pm, nw, :zones), htot)
+end
+
+"Variable to inspect total inertia"
+function variable_hvdc_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    dc_contr = _PM.var(pm, nw)[:dc_contr] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_dc_contr",
+    start = 0.0
+    )
+
+    if bounded
+        for (z, zone) in _PM.ref(pm, nw, :zones)
+            JuMP.set_lower_bound(dc_contr[z], -1e6)
+            JuMP.set_upper_bound(dc_contr[z],  1e6)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :zones, :dc_contr, _PM.ids(pm, nw, :zones), dc_contr)
+end

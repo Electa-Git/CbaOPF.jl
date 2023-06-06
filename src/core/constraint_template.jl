@@ -235,6 +235,7 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
     frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
     ΔT = frequency_parameters["t_fcr"]
     fmin = frequency_parameters["fmin"]
+    fmax = frequency_parameters["fmax"]
     f0 = frequency_parameters["f0"]
 
     zones = [i for i in _PM.ids(pm, nw, :zones)]
@@ -251,9 +252,9 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
         end
 
         if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
-            constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, z_convs, hvdc_contribution)
+            constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
         else
-            constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, z_convs, hvdc_contribution)
+            constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
         end
     end
 

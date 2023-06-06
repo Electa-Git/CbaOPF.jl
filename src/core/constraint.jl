@@ -73,10 +73,12 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, n::Int, i::I
     end
 end
 
-function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, gcont, ΔT, f0, fmin, zone_convs, hvdc_contribution)
+function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, gcont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
     ΔPg = _PM.var(pm, 1, :pg)[gcont]
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
+    htot = _PM.var(pm, n, :htot, zone)
+    dc_contr = _PM.var(pm, n, :dc_contr, zone)
 
     if isempty(zone_convs) || hvdc_contribution == false
         dc_contribution = 0
@@ -84,17 +86,22 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_prop
         dc_contribution = sum([(pconv_in[c] * conv["t_hvdc"] / 2 ) + (pconv_in[c] * (ΔT - conv["t_hvdc"])) for (c, conv) in zone_convs])
     end
 
-    cf = JuMP.@constraint(pm.model, 
+    JuMP.@constraint(pm.model, 
     sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (f0 - fmin)) >= 
      f0 * (ΔPg *  ΔT - dc_contribution)
     )
-    print(cf, "\n")
+
+    JuMP.@constraint(pm.model, f0 * (ΔPg *  ΔT - dc_contribution) >= (f0 - fmax))
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
-function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ΔT, f0, fmin, zone_convs, hvdc_contribution)
+function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ΔT, f0, fmin, fmax,  zone_convs, hvdc_contribution, zone)
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
-
+    htot = _PM.var(pm, n, :htot, zone)
+    dc_contr = _PM.var(pm, n, :dc_contr, zone)
 
     if isempty(zone_convs) || hvdc_contribution == false
         dc_contribution = 0
@@ -102,12 +109,14 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_prop
         dc_contribution = sum([(pconv_in[c] * conv["t_hvdc"] / 2 ) + (pconv_in[c] * (ΔT - conv["t_hvdc"])) for (c, conv) in zone_convs])
     end
 
-
-    cf = JuMP.@constraint(pm.model, 
+    JuMP.@constraint(pm.model, 
     sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (f0 - fmin)) >= 
-     f0 * dc_contribution
+    - f0 * dc_contribution
     )
-    print(cf, "\n")
+    JuMP.@constraint(pm.model, - f0 * dc_contribution >= (f0 - fmax))
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
 
