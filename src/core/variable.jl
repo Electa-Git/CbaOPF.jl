@@ -259,3 +259,20 @@ function variable_storage_energy_content(pm::_PM.AbstractPowerModel; nw::Int=_PM
 
     report && _PM.sol_component_value(pm, nw, :storage_simple, :es, _PM.ids(pm, nw, :storage_simple), es)
 end
+
+"Variable to model the power change of HVDC converter to provide inertia"
+function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    Δpconv = _PM.var(pm, nw)[:pconv_in] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_pconv_in",
+    start = _PM.comp_start_value(_PM.ref(pm, nw, :convdc, i), "P_g", 1.0)
+    )
+
+    if bounded
+        for (c, convdc) in _PM.ref(pm, nw, :convdc)
+            JuMP.set_lower_bound(Δpconv[c],  -2 * convdc["Pacrated"])
+            JuMP.set_upper_bound(Δpconv[c],   2 * convdc["Pacrated"])
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in, _PM.ids(pm, nw, :convdc), Δpconv)
+end

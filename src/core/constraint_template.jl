@@ -204,16 +204,31 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, i::Int; nw::
 end
 
 
-function constraint_frequency(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
     gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
     generator_properties = Dict()
+    zone_convs = Dict()
     for (g, gen) in _PM.ref(pm, nw, :gen)
-        if haskey(gen, "zone") && gen["zone"] == i && haskey(gen, "inertia_constants")
-            if g != gcont
-                push!(generator_properties, g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
-            else
-                push!(generator_properties, g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+        if haskey(gen, "zone")
+            zone = gen["zone"]
+            if !haskey(generator_properties, zone)
+                generator_properties[zone] = Dict()
             end
+            if g != gcont
+                push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+            else
+                push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+            end
+        end
+    end
+
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "zone")
+            zone = conv["zone"] 
+            if !haskey(zone_convs, zone)
+                zone_convs[zone] = Dict()
+            end
+            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
         end
     end
 
@@ -222,8 +237,31 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.
     fmin = frequency_parameters["fmin"]
     f0 = frequency_parameters["f0"]
 
+    zones = [i for i in _PM.ids(pm, nw, :zones)]
+    for i in zones
+        if haskey(generator_properties, i)
+            g_properties = generator_properties[i]
+        else
+            g_properties = Dict()
+        end
+        if haskey(zone_convs, i)
+            z_convs = zone_convs[i]
+        else
+            z_convs = Dict()
+        end
 
-    if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
-        constraint_frequency(pm, nw, generator_properties, gcont, ΔT, f0, fmin)
+        if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
+            constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, z_convs, hvdc_contribution)
+        else
+            constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, z_convs, hvdc_contribution)
+        end
     end
+
+end
+
+
+function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = 1
+
+    constraint_converter_power_balance(pm, i, nw, reference_network_idx)
 end

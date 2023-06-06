@@ -21,7 +21,7 @@ data = PowerModels.parse_file(file_ac)
 # Process demand reduction and curtailment data
 CbaOPF.add_flexible_demand_data!(data)
 # Process inertia data
-CbaOPF.prepare_data!(data)
+CbaOPF.prepare_data!(data; t_hvdc = 0.1)
 # Add empth dictionary for PSTs
 data["pst"] = Dict{String, Any}()
 if !haskey(data, "convdc")
@@ -39,7 +39,7 @@ mn_data = CbaOPF.create_generator_contingencies(data)
 # Process DC grid data
 _PMACDC.process_additional_data!(mn_data)
 # Provide addtional settings as part of the PowerModels settings dictionary
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true)
+s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true)
 
 result = CbaOPF.solve_fsopf(mn_data, _PM.DCPPowerModel, gurobi, setting = s, multinetwork = true)
 

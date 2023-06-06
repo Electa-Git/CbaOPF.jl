@@ -20,6 +20,7 @@ function build_fsopf(pm::_PM.AbstractPowerModel)
         variable_flexible_demand(pm; nw = n)
         variable_generator_state(pm; nw = n)
         variable_pst(pm; nw = n)
+        variable_converter_inertia(pm; nw = n)
     end
 
     network_ids = sort(collect(_PM.nw_ids(pm)))
@@ -62,9 +63,6 @@ function first_stage_model!(pm, n)
         _PMACDC.constraint_conv_transformer(pm, i; nw = n)
         _PMACDC.constraint_conv_reactor(pm, i; nw = n)
         _PMACDC.constraint_conv_filter(pm, i; nw = n)
-        if pm.ref[:it][:pm][:nw][n][:convdc][i]["islcc"] == 1
-            _PMACDC.constraint_conv_firing_angle(pm, i; nw = n)
-        end
     end
 
     for i in _PM.ids(pm, n, :flex_load)
@@ -84,13 +82,34 @@ end
 
 
 function second_stage_model!(pm, n)
+    if haskey(pm.setting, "hvdc_inertia_contribution") && pm.setting["hvdc_inertia_contribution"] == true
+    # converter equations to make sure that we have power balance....
+        for i in _PM.ids(pm, n, :busdc)
+            _PMACDC.constraint_power_balance_dc(pm, i; nw = n)
+        end
+
+        for i in _PM.ids(pm, n, :branchdc)
+            _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)
+        end
+
+        for i in _PM.ids(pm, n, :convdc)
+            _PMACDC.constraint_converter_losses(pm, i; nw = n)
+            _PMACDC.constraint_converter_current(pm, i; nw = n)
+            _PMACDC.constraint_conv_transformer(pm, i; nw = n)
+            _PMACDC.constraint_conv_reactor(pm, i; nw = n)
+            _PMACDC.constraint_conv_filter(pm, i; nw = n)
+            constraint_converter_power_balance(pm, i; nw = n)
+        end
+        constraint_frequency(pm; nw = n, hvdc_contribution = true)
+    else
+        constraint_frequency(pm; nw = n, hvdc_contribution = false)
+    end
+
+    
+    
+    # Binary generator status and on-off constraints -> for making UC problem later.....
     for i in _PM.ids(pm, n, :gen)
         constraint_generator_on_off(pm, i; nw = n, use_status = false)
         constraint_generator_status(pm, i; nw = n)
-    end
-
-    zones = [i for i in _PM.ids(pm, n, :zones)]
-    for i in zones
-        constraint_frequency(pm, i; nw = n)
     end
 end

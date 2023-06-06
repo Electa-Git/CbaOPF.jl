@@ -1,8 +1,16 @@
-function prepare_data!(data; borders = nothing)
+function prepare_data!(data; borders = nothing, t_hvdc = nothing)
     prepare_generator_data!(data)
 
     if !isnothing(borders)
         find_and_assign_xb_lines!(data, borders)
+    end
+
+    if haskey(data, "convdc")
+        for (c, conv) in data["convdc"]
+            conv_bus = conv["busac_i"]
+            conv["zone"] = data["bus"]["$conv_bus"]["zone"]
+            conv["t_hvdc"] = t_hvdc 
+        end
     end
 
     return data
