@@ -77,6 +77,6 @@ CbaOPF.print_frequency_information(result_dc, mn_data; fmin_idx = fmin_idx)
 for idx in 2:16
     for z_idx in 1:3
         c = idx - 1
-        print("Contingency ", c, " -> hvdc contribution into zone ", z_idx, " ", result_dc["1"]["solution"]["nw"]["$idx"]["zones"]["$z_idx"]["htot"], "\n")
+        print("Contingency ", c, " -> hvdc contribution into zone ", z_idx, " ", result_dc["1"]["solution"]["nw"]["$idx"]["zones"]["$z_idx"]["dc_contr"], "\n")
     end
 end
