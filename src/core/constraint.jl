@@ -136,3 +136,11 @@ function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int, 
 
     JuMP.@constraint(pm.model, pconv == pconv_ref - pconv_in)
 end
+
+function  constraint_converter_contribution_absolute(pm::_PM.AbstractPowerModel, i::Int, n::Int)
+    pconv_in = _PM.var(pm, n, :pconv_in, i)
+    pconv_in_abs = _PM.var(pm, n, :pconv_in_abs, i)
+
+    JuMP.@constraint(pm.model, pconv_in_abs >=  pconv_in)
+    JuMP.@constraint(pm.model, pconv_in_abs >= -pconv_in)
+end

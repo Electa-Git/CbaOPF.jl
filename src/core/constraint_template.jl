@@ -266,3 +266,7 @@ function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int; 
 
     constraint_converter_power_balance(pm, i, nw, reference_network_idx)
 end
+
+function constraint_converter_contribution_absolute(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    constraint_converter_contribution_absolute(pm, i, nw)
+end

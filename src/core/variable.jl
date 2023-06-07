@@ -260,6 +260,12 @@ function variable_storage_energy_content(pm::_PM.AbstractPowerModel; nw::Int=_PM
     report && _PM.sol_component_value(pm, nw, :storage_simple, :es, _PM.ids(pm, nw, :storage_simple), es)
 end
 
+function variable_hvdc_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
+    variable_converter_inertia(pm, nw = nw)
+    variable_converter_inertia_abs(pm, nw = nw)
+    variable_total_hvdc_inertia(pm, nw = nw)
+end
+
 "Variable to model the power change of HVDC converter to provide inertia"
 function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
     Δpconv = _PM.var(pm, nw)[:pconv_in] = JuMP.@variable(pm.model,
@@ -275,6 +281,23 @@ function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_i
     end
 
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in, _PM.ids(pm, nw, :convdc), Δpconv)
+end
+
+"Variable to represent absolute value HVDC converter inertia provision for the objective"
+function variable_converter_inertia_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    Δpconv_abs = _PM.var(pm, nw)[:pconv_in_abs] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_pconv_in",
+    start = _PM.comp_start_value(_PM.ref(pm, nw, :convdc, i), "P_g", 1.0)
+    )
+
+    if bounded
+        for (c, convdc) in _PM.ref(pm, nw, :convdc)
+            JuMP.set_lower_bound(Δpconv_abs[c],  0)
+            JuMP.set_upper_bound(Δpconv_abs[c],  2 * convdc["Pacrated"])
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in_abs, _PM.ids(pm, nw, :convdc), Δpconv_abs)
 end
 
 "Variable to inspect total inertia"
@@ -295,7 +318,7 @@ function variable_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default,
 end
 
 "Variable to inspect total inertia"
-function variable_hvdc_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+function variable_total_hvdc_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
     dc_contr = _PM.var(pm, nw)[:dc_contr] = JuMP.@variable(pm.model,
     [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_dc_contr",
     start = 0.0

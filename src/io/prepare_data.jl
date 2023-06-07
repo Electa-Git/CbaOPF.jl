@@ -1,4 +1,4 @@
-function prepare_data!(data; borders = nothing, t_hvdc = nothing)
+function prepare_data!(data; borders = nothing, t_hvdc = nothing, ffr_cost = nothing)
     prepare_generator_data!(data)
 
     if !isnothing(borders)
@@ -9,7 +9,8 @@ function prepare_data!(data; borders = nothing, t_hvdc = nothing)
         for (c, conv) in data["convdc"]
             conv_bus = conv["busac_i"]
             conv["zone"] = data["bus"]["$conv_bus"]["zone"]
-            conv["t_hvdc"] = t_hvdc 
+            conv["t_hvdc"] = t_hvdc
+            conv["ffr_cost"] = ffr_cost
         end
     end
 
@@ -129,4 +130,26 @@ function prepare_redispatch_data(opf_result, grid_data; contingency = nothing, r
         end
     end
     return grid_data_rd
+end
+
+
+function print_frequency_information(result, mn_data; fmin_idx = 1)
+    print("Objective = ", result["$fmin_idx"]["objective"], "\n")
+    contingencies = sort(parse.(Int, collect(keys(result["$fmin_idx"]["solution"]["nw"]))))[2:end]
+    for c in contingencies
+        c_res = result["$fmin_idx"]["solution"]["nw"]["$c"]
+        gen_id = mn_data["nw"]["$c"]["contingency"]["gen_id"]
+        ΔPg = result["$fmin_idx"]["solution"]["nw"]["1"]["gen"]["$gen_id"]["pg"] * result["$fmin_idx"]["solution"]["nw"]["1"]["gen"]["$gen_id"]["alpha_g"] 
+        f0 = mn_data["nw"]["1"]["frequency_parameters"]["f0"]
+        ΔT = mn_data["nw"]["1"]["frequency_parameters"]["t_fcr"]
+        for (z, zone) in c_res["zones"]
+            g_zone = mn_data["nw"]["1"]["gen"]["$gen_id"]["zone"]
+            if  g_zone == parse(Int, z)
+                f =  f0 * (1 - (ΔPg * ΔT - zone["dc_contr"]) / (2 * zone["htot"]))
+            else 
+                f =  f0 * (1 + (zone["dc_contr"]) / (2 * zone["htot"]))
+            end
+            print("Contingency of generator ", gen_id, " of ", round(ΔPg) * 100 ," MW in zone ", g_zone ," leads to f in zone ", z, " = ", f, " Hz", "\n")
+        end
+    end
 end

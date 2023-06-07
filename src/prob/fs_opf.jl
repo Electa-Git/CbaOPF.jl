@@ -20,7 +20,6 @@ function build_fsopf(pm::_PM.AbstractPowerModel)
         variable_flexible_demand(pm; nw = n)
         variable_generator_state(pm; nw = n)
         variable_pst(pm; nw = n)
-        variable_converter_inertia(pm; nw = n)
         variable_inertia(pm; nw = n)
         variable_hvdc_contribution(pm; nw = n)
     end
@@ -107,7 +106,9 @@ function second_stage_model!(pm, n)
         constraint_frequency(pm; nw = n, hvdc_contribution = false)
     end
 
-    
+    for i in _PM.ids(pm, n, :convdc)
+        constraint_converter_contribution_absolute(pm, i; nw = n)
+    end
     
     # Binary generator status and on-off constraints -> for making UC problem later.....
     for i in _PM.ids(pm, n, :gen)

@@ -80,6 +80,7 @@ end
 
 function objective_min_cost_frequency(pm::_PM.AbstractPowerModel; report::Bool=true)
     gen_cost = Dict()
+    ffr_cost = Dict()
 
     for (n, nw_ref) in _PM.nws(pm)
         for (i,gen) in nw_ref[:gen]
@@ -89,12 +90,24 @@ function objective_min_cost_frequency(pm::_PM.AbstractPowerModel; report::Bool=t
         end
     end
 
+    for (n, nw_ref) in _PM.nws(pm)
+        for (c, conv) in nw_ref[:convdc]
+            if n == 1
+                ffr_cost[(n,c)] = 0.0
+            else
+                pconv =  _PM.var(pm, n, :pconv_in_abs, c)
+                ffr_cost[(n,c)] = (pconv * conv["ffr_cost"]) * 1/2  # as it is summed-up
+            end
+        end
+    end
+
     load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
 
     return JuMP.@objective(pm.model, Min,
         sum( sum( gen_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm)) 
         + sum( sum( load_cost_curt[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
         + sum( sum( load_cost_red[(n,i)] for (i,load) in nw_ref[:load]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( ffr_cost[(n,i)] for (i,conv) in nw_ref[:convdc]) for (n, nw_ref) in _PM.nws(pm))
     )
 end
 
