@@ -287,8 +287,6 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
             end
         end
 
-        print(zone_convs)
-
         frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
         ΔT = frequency_parameters["t_fcr"]
         fmin = frequency_parameters["fmin"]
@@ -323,6 +321,68 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
     end
 end
 
+function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    if !isnothing(_PM.ref(pm, nw, :contingency)["conv_id"])
+        ccont = _PM.ref(pm, nw, :contingency)["conv_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone")
+                zone = gen["zone"]
+                if !haskey(generator_properties, zone)
+                    generator_properties[zone] = Dict()
+                end
+                push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+            end
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone")
+                zone = conv["zone"] 
+                if !haskey(zone_convs, zone)
+                    zone_convs[zone] = Dict()
+                end
+                if c != ccont
+                    push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+                end
+            end
+        end
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔT = frequency_parameters["t_fcr"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+
+        zones = [i for i in _PM.ids(pm, nw, :zones)]
+        for i in zones
+            if haskey(generator_properties, i)
+                g_properties = generator_properties[i]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, i)
+                z_convs = zone_convs[i]
+            else
+                z_convs = Dict()
+            end
+
+            if _PM.ref(pm, nw, :convdc, ccont)["zone"] == i
+                constraint_frequency_converter(pm, nw, g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            end
+        end
+    end
+end
+
+function constraint_dc_branch_contingency(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    branch =_PM.ref(pm, nw, :branchdc, i)
+    f_bus = branch["fbusdc"]
+    t_bus = branch["tbusdc"]
+    f_idx = (i, f_bus, t_bus)
+    t_idx = (i, t_bus, f_bus)
+
+    constraint_dc_branch_contingency(pm, nw, f_idx, t_idx)
+end
 
 function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     reference_network_idx = 1

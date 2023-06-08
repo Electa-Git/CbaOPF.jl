@@ -90,7 +90,11 @@ function second_stage_model!(pm, n)
         end
 
         for i in _PM.ids(pm, n, :branchdc)
-            _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)
+            if !isnothing(_PM.ref(pm, n, :contingency)["branch_id"]) &&  _PM.ref(pm, n, :contingency)["branch_id"] == i
+                constraint_dc_branch_contingency(pm, i; nw = n)
+            else
+                _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)
+            end
         end
 
         for i in _PM.ids(pm, n, :convdc)
@@ -103,9 +107,11 @@ function second_stage_model!(pm, n)
         end
         constraint_frequency(pm; nw = n, hvdc_contribution = true)
         constraint_frequency_tie_line(pm; nw = n, hvdc_contribution = true)
+        constraint_frequency_converter(pm; nw = n, hvdc_contribution = true)
     else
         constraint_frequency(pm; nw = n, hvdc_contribution = false)
         constraint_frequency_tie_line(pm; nw = n, hvdc_contribution = false)
+        constraint_frequency_converter(pm; nw = n, hvdc_contribution = false)
     end
 
     for i in _PM.ids(pm, n, :convdc)

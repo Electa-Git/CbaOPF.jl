@@ -146,7 +146,29 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, gener
     JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
+function constraint_frequency_converter(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ccont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
+    ΔPc = - _PM.var(pm, 1, :pconv_ac)[ccont]
+    alpha_g = _PM.var(pm, n, :alpha_g)
+    pconv_in = _PM.var(pm, n, :pconv_in)
+    htot = _PM.var(pm, n, :htot, zone)
+    dc_contr = _PM.var(pm, n, :dc_contr, zone)
 
+    if isempty(zone_convs) || hvdc_contribution == false
+        dc_contribution = 0
+    else
+        dc_contribution = sum([(pconv_in[c] * conv["t_hvdc"] / 2 ) + (pconv_in[c] * (ΔT - conv["t_hvdc"])) for (c, conv) in zone_convs])
+    end
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (f0 - fmin)) >= 
+     f0 * (ΔPc *  ΔT - dc_contribution)
+    )
+
+    JuMP.@constraint(pm.model, f0 * (ΔPc *  ΔT - dc_contribution) >= (f0 - fmax))
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution)
+end
 
 function constraint_generator_status(pm::_PM.AbstractPowerModel, n::Int, i::Int)
     alpha_n = _PM.var(pm, n, :alpha_g, i)
@@ -169,4 +191,13 @@ function  constraint_converter_contribution_absolute(pm::_PM.AbstractPowerModel,
 
     JuMP.@constraint(pm.model, pconv_in_abs >=  pconv_in)
     JuMP.@constraint(pm.model, pconv_in_abs >= -pconv_in)
+end
+
+
+function constraint_dc_branch_contingency(pm::_PM.AbstractPowerModel, n::Int, f_idx, t_idx)
+    p_fr = _PM.var(pm, n, :p_dcgrid, f_idx)
+    p_to = _PM.var(pm, n, :p_dcgrid, t_idx)
+
+    JuMP.@constraint(pm.model, p_fr == 0)
+    JuMP.@constraint(pm.model, p_to == 0)
 end

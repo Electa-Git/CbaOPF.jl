@@ -94,19 +94,29 @@ end
 function create_contingencies(data)
     generator_contingencies = length(data["gen"])
     tie_line_contingencies = length(data["tie_lines"]) 
-    number_of_contingencies = generator_contingencies + tie_line_contingencies + 1 # to also add the N case
+    converter_contingencies = length(data["convdc"]) 
+    dc_branch_contingencies = length(data["branchdc"]) 
+    number_of_contingencies = generator_contingencies + tie_line_contingencies + converter_contingencies +  dc_branch_contingencies + 1 # to also add the N case
     gen_keys = sort(parse.(Int, collect(keys(data["gen"]))))
+    conv_keys = sort(parse.(Int, collect(keys(data["convdc"]))))
     tie_line_keys = sort(parse.(Int, collect(keys(data["tie_lines"]))))
+    dc_branch_keys = sort(parse.(Int, collect(keys(data["branchdc"]))))
     mn_data = _IM.replicate(data, number_of_contingencies, Set{String}(["source_type", "name", "source_version", "per_unit"]))
 
     for idx in 1:number_of_contingencies
         if idx == 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
         elseif idx <= generator_contingencies + 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1], "branch_id" => nothing)
-        else
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1], "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
+        elseif idx <= generator_contingencies + tie_line_contingencies + 1
             b_idx = idx - generator_contingencies - 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => tie_line_keys[b_idx])
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => tie_line_keys[b_idx], "conv_id" => nothing, "dcbranch_id" => nothing)
+        elseif idx <= generator_contingencies + tie_line_contingencies + converter_contingencies + 1
+            c_idx = idx - generator_contingencies - tie_line_contingencies - 1
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => conv_keys[c_idx], "dcbranch_id" => nothing)
+        else
+            b_idx = idx - generator_contingencies - tie_line_contingencies - converter_contingencies - 1
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => dc_branch_keys[b_idx])
         end
     end
     return mn_data
