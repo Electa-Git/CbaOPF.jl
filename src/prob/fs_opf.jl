@@ -102,8 +102,10 @@ function second_stage_model!(pm, n)
             constraint_converter_power_balance(pm, i; nw = n)
         end
         constraint_frequency(pm; nw = n, hvdc_contribution = true)
+        constraint_frequency_tie_line(pm; nw = n, hvdc_contribution = true)
     else
         constraint_frequency(pm; nw = n, hvdc_contribution = false)
+        constraint_frequency_tie_line(pm; nw = n, hvdc_contribution = false)
     end
 
     for i in _PM.ids(pm, n, :convdc)

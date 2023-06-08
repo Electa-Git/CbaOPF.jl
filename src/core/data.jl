@@ -91,17 +91,22 @@ function add_flexible_demand_data!(data)
     return data
 end
 
-
-function create_generator_contingencies(data)
-    number_of_contingencies = length(data["gen"]) + 1
+function create_contingencies(data)
+    generator_contingencies = length(data["gen"])
+    tie_line_contingencies = length(data["tie_lines"]) 
+    number_of_contingencies = generator_contingencies + tie_line_contingencies + 1 # to also add the N case
     gen_keys = sort(parse.(Int, collect(keys(data["gen"]))))
+    tie_line_keys = sort(parse.(Int, collect(keys(data["tie_lines"]))))
     mn_data = _IM.replicate(data, number_of_contingencies, Set{String}(["source_type", "name", "source_version", "per_unit"]))
 
-    for idx in 1:length(gen_keys)+1
+    for idx in 1:number_of_contingencies
         if idx == 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing)
+        elseif idx <= generator_contingencies + 1
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1], "branch_id" => nothing)
         else
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1])
+            b_idx = idx - generator_contingencies - 1
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => tie_line_keys[b_idx])
         end
     end
     return mn_data

@@ -119,6 +119,32 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_prop
     JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
+function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, br_idx, area)
+    ΔP = _PM.var(pm, 1, :p)[br_idx]
+    alpha_g = _PM.var(pm, n, :alpha_g)
+    pconv_in = _PM.var(pm, n, :pconv_in)
+    htot = _PM.var(pm, n, :htot_area, area)
+    dc_contr = _PM.var(pm, n, :dc_contr_area, area)
+
+    if isempty(zone_convs) || hvdc_contribution == false
+        dc_contribution = 0
+    else
+        dc_contribution = sum([(pconv_in[c] * conv["t_hvdc"] / 2 ) + (pconv_in[c] * (ΔT - conv["t_hvdc"])) for (c, conv) in zone_convs])
+    end
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (f0 - fmin)) >= 
+     f0 * (-ΔP *  ΔT - dc_contribution)
+    )
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]) *  (2 * (fmax - f0)) >= 
+     f0 * (ΔP *  ΔT - dc_contribution)
+    )
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * alpha_g[g] for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution)
+end
 
 
 

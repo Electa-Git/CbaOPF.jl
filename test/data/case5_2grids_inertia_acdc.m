@@ -102,7 +102,7 @@ mpc.branch = [
 8	 9	 0.00297	 0.0297	 0.00674	 426	 426	 426	 0.0	  0.0	 1	 -30.0	 30.0;
 9	 10	 0.00297	 0.0297	 0.00674	 240.0	 240.0	 240.0	 0.0	  0.0	 1	 -30.0	 30.0;
 
-10	 5	 0.00281	 0.0281	 0.00712	 600.0	 600.0	 600.0	 0.0	  0.0	 1	 -60.0	 60.0; % cross-border ac line
+10	 5	 0.00281	 0.0281	 0.00712	 300.0	 300.0	 300.0	 0.0	  0.0	 1	 -60.0	 60.0; % cross-border ac line
 ];
 
 %column_names%   br_idx area_fr area_to
@@ -115,6 +115,30 @@ mpc.areas = [
 	1;
 	2;
 ]
+
+%% dc grid topology
+%colunm_names% dcpoles
+mpc.dcpol=2;
+% numbers of poles (1=monopolar grid, 2=bipolar grid)
+%% bus data
+%column_names%   busdc_i grid    Pdc     Vdc     basekVdc    Vdcmax  Vdcmin  Cdc
+mpc.busdc = [
+    1              1       0       1       525         1.1     0.9     0; % grid 1
+    2              1       0       1       525         1.1     0.9     0; % grid 2
+];
+
+%% converters
+%column_names%   busdc_i busac_i type_dc type_ac P_g   Q_g islcc  Vtar    rtf xtf  transformer tm   bf filter    rc      xc  reactor   basekVac    Vmmax   Vmmin   Imax    status   LossA LossB  LossCrec LossCinv  droop      Pdcset    Vdcset  dVdcset Pacmax Pacmin Qacmax Qacmin
+mpc.convdc = [
+    1       5   1       1       0       0     0 1     0.001427989  0.049979604 1 1 1.51 1 0.000832871  0.024986123 1  525         1.1     0.9     1.1     1       0.33099 1.3943009  0.006171667    0.006171667      0    0   0  0 300 -300 100 -100;
+    2      10   2       1       0       0     0 1     0.001427989  0.049979604 1 1 1.51 1 0.000832871  0.024986123 1  525         1.1     0.9     1.1     1       0.33099 1.3943009  0.006171667    0.006171667      0    0   0  0 300 -300 100 -100;
+];
+
+%% branches
+%column_names%   fbusdc  tbusdc  r      l        c   rateA   rateB   rateC   status
+mpc.branchdc = [
+    1       2       0.000144158   0   0    300     300     300     1;
+ ];
 
 %column_names% load_id  pred_rel_max  cost_red  cost_curt  flex 
 mpc.load_extra = [

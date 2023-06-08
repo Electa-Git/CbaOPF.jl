@@ -205,59 +205,122 @@ end
 
 
 function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
-    gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
-    generator_properties = Dict()
-    zone_convs = Dict()
-    for (g, gen) in _PM.ref(pm, nw, :gen)
-        if haskey(gen, "zone")
-            zone = gen["zone"]
-            if !haskey(generator_properties, zone)
-                generator_properties[zone] = Dict()
+    if !isnothing(_PM.ref(pm, nw, :contingency)["gen_id"])
+        gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone")
+                zone = gen["zone"]
+                if !haskey(generator_properties, zone)
+                    generator_properties[zone] = Dict()
+                end
+                if g != gcont
+                    push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+                else
+                    push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+                end
             end
-            if g != gcont
-                push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone")
+                zone = conv["zone"] 
+                if !haskey(zone_convs, zone)
+                    zone_convs[zone] = Dict()
+                end
+                push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+            end
+        end
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔT = frequency_parameters["t_fcr"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+
+        zones = [i for i in _PM.ids(pm, nw, :zones)]
+        for i in zones
+            if haskey(generator_properties, i)
+                g_properties = generator_properties[i]
             else
-                push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, i)
+                z_convs = zone_convs[i]
+            else
+                z_convs = Dict()
+            end
+
+            if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
+                constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            else
+                constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             end
         end
     end
+end
 
-    for (c, conv) in _PM.ref(pm, nw, :convdc)
-        if haskey(conv, "zone")
-            zone = conv["zone"] 
-            if !haskey(zone_convs, zone)
-                zone_convs[zone] = Dict()
+
+function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    if !isnothing(_PM.ref(pm, nw, :contingency)["branch_id"])
+        bcont = _PM.ref(pm, nw, :contingency)["branch_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "area")
+                area = gen["area"]
+                if !haskey(generator_properties, area)
+                    generator_properties[area] = Dict()
+                end
+                push!(generator_properties[area], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
             end
-            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "area")
+                area = conv["area"] 
+                if !haskey(zone_convs, area)
+                    zone_convs[area] = Dict()
+                end
+                push!(zone_convs[area], c => Dict("t_hvdc" => conv["t_hvdc"]))
+            end
+        end
+
+        print(zone_convs)
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔT = frequency_parameters["t_fcr"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+        tie_line = _PM.ref(pm, nw, :tie_lines)[bcont]
+        br_id = tie_line["br_idx"]
+        f_idx = _PM.ref(pm, nw, :branch)[br_id]["f_bus"]
+        t_idx = _PM.ref(pm, nw, :branch)[br_id]["t_bus"]
+        area_fr = tie_line["area_fr"]
+        area_to = tie_line["area_to"]
+        areas = [area_fr area_to]
+        for i in areas
+            if i == area_fr
+                br_idx = (br_id, f_idx, t_idx)
+            else
+                br_idx = (br_id, t_idx, f_idx)
+            end
+            if haskey(generator_properties, i)
+                g_properties = generator_properties[i]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, i)
+                z_convs = zone_convs[i]
+            else
+                z_convs = Dict()
+            end
+
+            constraint_frequency_tie_line(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, br_idx, i)
         end
     end
-
-    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
-    ΔT = frequency_parameters["t_fcr"]
-    fmin = frequency_parameters["fmin"]
-    fmax = frequency_parameters["fmax"]
-    f0 = frequency_parameters["f0"]
-
-    zones = [i for i in _PM.ids(pm, nw, :zones)]
-    for i in zones
-        if haskey(generator_properties, i)
-            g_properties = generator_properties[i]
-        else
-            g_properties = Dict()
-        end
-        if haskey(zone_convs, i)
-            z_convs = zone_convs[i]
-        else
-            z_convs = Dict()
-        end
-
-        if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
-            constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
-        else
-            constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
-        end
-    end
-
 end
 
 

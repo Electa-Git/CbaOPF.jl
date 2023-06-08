@@ -12,43 +12,34 @@ import  LaTeXStrings
 
 
 # Load test file
-file_ac = "./test/data/case5_2grids_inertia.m"
-file_dc = "./test/data/case5_3grids_inertia_hvdc.m"
+file = "./test/data/case5_2grids_inertia_acdc.m"
 plot_path = "/Users/hergun/Library/CloudStorage/OneDrive-KULeuven/Projects/HVDC_H2/plots"
 
 # Define solvers
 ipopt = JuMP.optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6)
 gurobi = JuMP.optimizer_with_attributes(Gurobi.Optimizer)
 # Parse file using PowerModels
-data = PowerModels.parse_file(file_dc)
+data = PowerModels.parse_file(file)
 # Process demand reduction and curtailment data
 CbaOPF.add_flexible_demand_data!(data)
 # Process inertia data
 CbaOPF.prepare_data!(data; t_hvdc = 0.10, ffr_cost = 50.0)
-# Add empth dictionary for PSTs
-data["pst"] = Dict{String, Any}()
-if !haskey(data, "convdc")
-    data["busdc"] = Dict{String, Any}()
-    data["convdc"] = Dict{String, Any}()
-    data["branchdc"] = Dict{String, Any}()
-end
 
-fmin = 49.0:0.05:49.6
+fmin = 49.0:0.05:49.8
 objective_no_dc = zeros(1, length(fmin))
 objective_dc = zeros(1, length(fmin))
 
 result_no_dc = Dict{String, Any}(["$idx"=>Dict{String, Any}() for idx = 1:length(fmin)])
 result_dc = Dict{String, Any}(["$idx"=>Dict{String, Any}() for idx = 1:length(fmin)])
-
 for idx = 1:length(fmin)
     # Add frequency stability data
     data["frequency_parameters"] = Dict{String, Any}()
     data["frequency_parameters"]["fmin"] = fmin[idx]
-    data["frequency_parameters"]["fmax"] = 50.0
     data["frequency_parameters"]["f0"] = 50.0
+    data["frequency_parameters"]["fmax"] =  data["frequency_parameters"]["f0"] + ((data["frequency_parameters"]["f0"] - fmin[idx]))
     data["frequency_parameters"]["t_fcr"] = 0.2
     # Add generator contingencies
-    mn_data = CbaOPF.create_generator_contingencies(data)
+    mn_data = CbaOPF.create_contingencies(data)
     # Process DC grid data
     _PMACDC.process_additional_data!(mn_data)
     # Provide addtional settings as part of the PowerModels settings dictionary
@@ -67,16 +58,24 @@ plot_filename = joinpath(plot_path, "objective_comparison.pdf")
 Plots.savefig(p1, plot_filename)
 
 
-fmin_idx = 1
-mn_data = CbaOPF.create_generator_contingencies(data)
+fmin_idx = length(fmin)
+mn_data = CbaOPF.create_contingencies(data)
 print("########### NO HVDC contribution for fmin = ", fmin[fmin_idx], " Hz #####################", "\n")
 CbaOPF.print_frequency_information(result_no_dc, mn_data; fmin_idx = fmin_idx)
 print("########### With HVDC contribution for fmin = ", fmin[fmin_idx], " Hz #####################", "\n")
 CbaOPF.print_frequency_information(result_dc, mn_data; fmin_idx = fmin_idx)
 
-for idx in 2:16
-    for z_idx in 1:3
-        c = idx - 1
-        print("Contingency ", c, " -> hvdc contribution into zone ", z_idx, " ", result_dc["1"]["solution"]["nw"]["$idx"]["zones"]["$z_idx"]["dc_contr"], "\n")
-    end
-end
+
+br_idx = data["tie_lines"]["1"]["br_idx"]
+tie_line_flows = [result_no_dc["$idx"]["solution"]["nw"]["1"]["branch"]["$br_idx"]["pf"] for idx in 1:length(fmin)] * data["baseMVA"]
+tie_line_flows_dc = [result_dc["$idx"]["solution"]["nw"]["1"]["branch"]["$br_idx"]["pf"] for idx in 1:length(fmin)] * data["baseMVA"]
+
+p2 = Plots.plot(fmin, tie_line_flows, xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Flow~in~MVA\$", label = "tie line flow zone 1 -> zone 2, without HVDC contribution")
+Plots.plot!(p2, fmin, tie_line_flows_dc,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~€\$", label = "tie line flow zone 1 -> zone 2, with HVDC contribution")
+plot_filename = joinpath(plot_path, "tieline_flows.pdf")
+Plots.savefig(p2, plot_filename)
+
+
+# p1 = Plots.plot(fmin, objective_no_dc', xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~€\$", label = "total cost")
+# plot_filename = joinpath(plot_path, "objective_comparison.pdf")
+# Plots.savefig(p1, plot_filename)
