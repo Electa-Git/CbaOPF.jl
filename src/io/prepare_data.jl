@@ -49,6 +49,16 @@ function prepare_generator_data!(data)
         gen["area"] = data["bus"]["$bus_id"]["area"]
         gen["start_up_cost"] = gen["startup"]
         gen["inertia_constants"] = data["inertia_constants"][g]["inertia_constant"]
+        gen["ramp_rate"] = data["inertia_constants"][g]["ramp_rate"]
+        if data["inertia_constants"][g]["inertia_constant"] <= 1
+            gen["mut"] = 1
+            gen["mdt"] = 1
+            gen["res"] = true
+        else
+            gen["mut"] = 3
+            gen["mdt"] = 4
+            gen["res"] = false
+        end
     end
 end
 

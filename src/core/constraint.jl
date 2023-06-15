@@ -73,8 +73,8 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, n::Int, i::I
     end
 end
 
-function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, gcont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
-    ΔPg = _PM.var(pm, 1, :pg)[gcont]
+function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, gcont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
+    ΔPg = _PM.var(pm, ref_id, :pg)[gcont]
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot, zone)
@@ -97,7 +97,7 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_prop
     JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
-function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ΔT, f0, fmin, fmax,  zone_convs, hvdc_contribution, zone)
+function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔT, f0, fmin, fmax,  zone_convs, hvdc_contribution, zone)
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot, zone)
@@ -119,7 +119,7 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, generator_prop
     JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
-function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, br_idx, area)
+function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, br_idx, area)
     ΔP = _PM.var(pm, 1, :p)[br_idx]
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
@@ -146,7 +146,7 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, gener
     JuMP.@constraint(pm.model, dc_contr == dc_contribution)
 end
 
-function constraint_frequency_converter(pm::_PM.AbstractPowerModel, n::Int, generator_properties, ccont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
+function constraint_frequency_converter(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ccont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
     ΔPc = - _PM.var(pm, 1, :pconv_ac)[ccont]
     alpha_g = _PM.var(pm, n, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
@@ -175,6 +175,62 @@ function constraint_generator_status(pm::_PM.AbstractPowerModel, n::Int, i::Int)
     alpha_n_1 = _PM.var(pm, n-1, :alpha_g, i)
 
     JuMP.@constraint(pm.model, alpha_n == alpha_n_1)
+end
+
+function constraint_generator_status_cont(pm::_PM.AbstractPowerModel, n::Int, i::Int, ref_id)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    alpha_n_1 = _PM.var(pm, ref_id, :alpha_g, i)
+
+    JuMP.@constraint(pm.model, alpha_n == alpha_n_1)
+end
+
+
+function constraint_generator_status_uc(pm::_PM.AbstractPowerModel, n::Int, i::Int, prev_hour)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    alpha_n_1 = _PM.var(pm, prev_hour, :alpha_g, i)
+
+    JuMP.@constraint(pm.model, alpha_n == alpha_n_1)
+end
+
+
+function constraint_generator_decisions(pm::_PM.AbstractPowerModel, i::Int, n::Int, prev_hour)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    alpha_n_1 = _PM.var(pm, prev_hour, :alpha_g, i)
+    beta_n = _PM.var(pm, n, :beta_g, i)
+    gamma_n = _PM.var(pm, n, :gamma_g, i)
+
+    JuMP.@constraint(pm.model, alpha_n_1 - alpha_n + beta_n - gamma_n == 0)
+end
+
+function constraint_initial_generator_decisions(pm::_PM.AbstractPowerModel, i::Int, n::Int)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    beta_n = _PM.var(pm, n, :beta_g, i)
+    gamma_n = _PM.var(pm, n, :gamma_g, i)
+
+    JuMP.@constraint(pm.model, - alpha_n + beta_n - gamma_n == 0)
+end
+
+function constraint_minimum_up_time(pm::_PM.AbstractPowerModel, i::Int, n::Int, τ)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+
+    JuMP.@constraint(pm.model, alpha_n >= sum([_PM.var(pm, t, :beta_g, i) for t in τ]))
+end
+
+function constraint_minimum_down_time(pm::_PM.AbstractPowerModel, i::Int, n::Int, τ)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+
+    JuMP.@constraint(pm.model, (1 - alpha_n) >= sum([_PM.var(pm, t, :gamma_g, i) for t in τ]))
+end
+
+function constraint_generator_ramping(pm::_PM.AbstractPowerModel, i::Int, n::Int, prev_hour, ΔPg_up, ΔPg_down, pmin)
+    pg_n = _PM.var(pm, n, :pg, i)
+    pg_n_1 = _PM.var(pm, prev_hour, :pg, i)
+    alpha_n = _PM.var(pm, n, :alpha_g, i)
+    beta_n = _PM.var(pm, n, :beta_g, i)
+    gamma_n = _PM.var(pm, n, :gamma_g, i)
+
+    JuMP.@constraint(pm.model, pg_n - pg_n_1 <= ΔPg_up * alpha_n + (pmin - ΔPg_up) * beta_n)
+    JuMP.@constraint(pm.model, pg_n_1 - pg_n <= ΔPg_down * alpha_n + pmin * gamma_n)
 end
 
 function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int, n::Int, reference_network_idx)

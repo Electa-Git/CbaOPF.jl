@@ -91,33 +91,95 @@ function add_flexible_demand_data!(data)
     return data
 end
 
-function create_contingencies(data)
+function create_contingencies!(mn_data, number_of_hours, number_of_contingencies)
+
+    gen_keys = sort(parse.(Int, collect(keys(mn_data["nw"]["1"]["gen"]))))
+    conv_keys = sort(parse.(Int, collect(keys(mn_data["nw"]["1"]["convdc"]))))
+    tie_line_keys = sort(parse.(Int, collect(keys(mn_data["nw"]["1"]["tie_lines"]))))
+    dc_branch_keys = sort(parse.(Int, collect(keys(mn_data["nw"]["1"]["branchdc"]))))
+
+    for idx in 1:number_of_hours * number_of_contingencies
+        if any(idx .== mn_data["hour_ids"])
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
+        elseif mod(idx - 1, number_of_contingencies) <= length(gen_keys)
+            c_id = mod(idx - 1, number_of_contingencies)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[c_id], "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
+        elseif mod(idx - 1, number_of_contingencies) <= length(gen_keys) + length(tie_line_keys)
+            c_id = mod(idx - 1, number_of_contingencies)
+            b_idx = c_id - length(gen_keys)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => tie_line_keys[b_idx], "conv_id" => nothing, "dcbranch_id" => nothing)
+        elseif mod(idx - 1, number_of_contingencies) <= length(gen_keys) + length(tie_line_keys) + length(conv_keys)
+            c_id = mod(idx - 1, number_of_contingencies)
+            c_idx = c_id - length(gen_keys) - length(tie_line_keys)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => conv_keys[c_idx], "dcbranch_id" => nothing)
+        else
+            c_id = mod(idx-1, number_of_contingencies)
+            b_idx = c_id - length(gen_keys) - length(tie_line_keys) - length(conv_keys)
+            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => dc_branch_keys[b_idx])
+        end
+    end
+    return mn_data
+end
+
+
+
+
+function create_multinetwork_model!(data, number_of_hours, g_series, l_series)
+
     generator_contingencies = length(data["gen"])
     tie_line_contingencies = length(data["tie_lines"]) 
     converter_contingencies = length(data["convdc"]) 
     dc_branch_contingencies = length(data["branchdc"]) 
     number_of_contingencies = generator_contingencies + tie_line_contingencies + converter_contingencies +  dc_branch_contingencies + 1 # to also add the N case
-    gen_keys = sort(parse.(Int, collect(keys(data["gen"]))))
-    conv_keys = sort(parse.(Int, collect(keys(data["convdc"]))))
-    tie_line_keys = sort(parse.(Int, collect(keys(data["tie_lines"]))))
-    dc_branch_keys = sort(parse.(Int, collect(keys(data["branchdc"]))))
-    mn_data = _IM.replicate(data, number_of_contingencies, Set{String}(["source_type", "name", "source_version", "per_unit"]))
 
-    for idx in 1:number_of_contingencies
-        if idx == 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
-        elseif idx <= generator_contingencies + 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => gen_keys[idx - 1], "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => nothing)
-        elseif idx <= generator_contingencies + tie_line_contingencies + 1
-            b_idx = idx - generator_contingencies - 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => tie_line_keys[b_idx], "conv_id" => nothing, "dcbranch_id" => nothing)
-        elseif idx <= generator_contingencies + tie_line_contingencies + converter_contingencies + 1
-            c_idx = idx - generator_contingencies - tie_line_contingencies - 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => conv_keys[c_idx], "dcbranch_id" => nothing)
+
+
+    # This for loop determines which "network" belongs to an hour, and which to a contingency, for book-keeping of the network ids
+    # Format: [h1, c1 ... cn, h2, c1 ... cn, .... , hn, c1 ... cn]
+    hour_ids = [];
+    cont_ids = [];
+    for i in 1:number_of_hours * number_of_contingencies
+        if mod(i, number_of_contingencies) == 1
+            push!(hour_ids, i)
         else
-            b_idx = idx - generator_contingencies - tie_line_contingencies - converter_contingencies - 1
-            mn_data["nw"]["$idx"]["contingency"] = Dict{String, Any}("gen_id" => nothing, "branch_id" => nothing, "conv_id" => nothing, "dcbranch_id" => dc_branch_keys[b_idx])
+            push!(cont_ids, i)
         end
     end
+
+    ########### Using _IM.replicate networks
+
+    mn_data = _IM.replicate(data, number_of_hours * number_of_contingencies, Set{String}(["source_type", "name", "source_version", "per_unit"]))
+
+    # Add hour_ids and contingency_ids to the data dictionary 
+    mn_data["hour_ids"] = hour_ids
+    mn_data["cont_ids"] = cont_ids
+    mn_data["number_of_hours"] = number_of_hours
+    mn_data["number_of_contingencies"] = number_of_contingencies
+
+    create_contingencies!(mn_data, number_of_hours, number_of_contingencies)
+
+    # This loop writes the generation and demand time series data
+    iter = 0
+    for nw = 1:number_of_hours * number_of_contingencies
+        if mod(nw, number_of_contingencies) == 1
+            iter += 1
+            h_idx = Int(nw - number_of_contingencies + 1)
+        end
+        h_idx = iter
+        for (g, gen) in mn_data["nw"]["$nw"]["gen"]
+            if gen["res"] == true
+                gen["pmax"] = g_series[h_idx] * gen["pmax"]
+            end
+        end
+        for (l, load) in mn_data["nw"]["$nw"]["load"]
+            load["pd"] = l_series[h_idx] * load["pd"]
+        end
+    end
+
+    _PMACDC.process_additional_data!(mn_data)
+
+
+
+
     return mn_data
 end

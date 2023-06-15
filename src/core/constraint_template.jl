@@ -129,6 +129,18 @@ function constraint_generator_status(pm::_PM.AbstractPowerModel, i::Int; nw::Int
     constraint_generator_status(pm, nw, i)
 end
 
+function constraint_generator_status_uc(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    previous_hour_network = get_previous_hour_network_id(pm, nw)
+
+    constraint_generator_status_uc(pm, nw, i, previous_hour_network)
+end
+
+function constraint_generator_status_cont(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    constraint_generator_status_cont(pm, nw, i, reference_network_idx)
+end
+
+
 function constraint_active_conv_setpoint(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     conv = _PM.ref(pm, nw, :convdc, i)
     
@@ -205,6 +217,8 @@ end
 
 
 function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
     if !isnothing(_PM.ref(pm, nw, :contingency)["gen_id"])
         gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
         generator_properties = Dict()
@@ -253,9 +267,9 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
             end
 
             if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
-                constraint_frequency(pm, nw, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             else
-                constraint_frequency(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             end
         end
     end
@@ -263,6 +277,8 @@ end
 
 
 function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
     if !isnothing(_PM.ref(pm, nw, :contingency)["branch_id"])
         bcont = _PM.ref(pm, nw, :contingency)["branch_id"]
         generator_properties = Dict()
@@ -316,12 +332,14 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
                 z_convs = Dict()
             end
 
-            constraint_frequency_tie_line(pm, nw, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, br_idx, i)
+            constraint_frequency_tie_line(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, br_idx, i)
         end
     end
 end
 
 function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
     if !isnothing(_PM.ref(pm, nw, :contingency)["conv_id"])
         ccont = _PM.ref(pm, nw, :contingency)["conv_id"]
         generator_properties = Dict()
@@ -368,7 +386,7 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
             end
 
             if _PM.ref(pm, nw, :convdc, ccont)["zone"] == i
-                constraint_frequency_converter(pm, nw, g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             end
         end
     end
@@ -385,11 +403,79 @@ function constraint_dc_branch_contingency(pm::_PM.AbstractPowerModel, i::Int; nw
 end
 
 function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
-    reference_network_idx = 1
+    reference_network_idx = get_reference_network_id(pm, nw)
 
     constraint_converter_power_balance(pm, i, nw, reference_network_idx)
 end
 
 function constraint_converter_contribution_absolute(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     constraint_converter_contribution_absolute(pm, i, nw)
+end
+
+function get_reference_network_id(pm::_PM.AbstractPowerModel, nw::Int)
+    number_of_contingencies = pm.ref[:it][:pm][:number_of_contingencies]
+    if mod(nw, number_of_contingencies) == 0
+        hour_id = Int(nw - number_of_contingencies + 1)
+    else
+        hour_id = Int(nw - mod(nw, number_of_contingencies) + 1)
+    end
+
+    reference_network_idx = hour_id
+
+    return reference_network_idx 
+end
+
+function get_previous_hour_network_id(pm::_PM.AbstractPowerModel, nw::Int)
+    number_of_contingencies = pm.ref[:it][:pm][:number_of_contingencies]
+    previous_hour_id = Int((nw - 1) / number_of_contingencies)
+    previous_hour_network = pm.ref[:it][:pm][:hour_ids][previous_hour_id]
+
+    return previous_hour_network
+end
+
+function contstraint_unit_commitment(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    constraint_generator_decisions(pm, i, nw)
+    constraint_minimum_up_time(pm, i, nw)
+    constraint_minimum_down_time(pm, i, nw)
+end
+
+function constraint_generator_decisions(pm::_PM.AbstractPowerModel, i::Int, nw::Int = _PM.nw_id_default)
+    if nw == 1
+        constraint_initial_generator_decisions(pm, i, nw)
+    else
+        previous_hour_network = get_previous_hour_network_id(pm, nw)
+        constraint_generator_decisions(pm, i, nw, previous_hour_network)
+        constraint_generator_ramping(pm, i, nw, previous_hour_network)
+    end
+end
+
+function constraint_minimum_up_time(pm::_PM.AbstractPowerModel, i::Int, nw::Int = _PM.nw_id_default)
+    gen =_PM.ref(pm, nw, :gen, i)
+    mut = gen["mut"]
+    interval = pm.ref[:it][:pm][:number_of_contingencies]
+    h_start = max(1, (nw + interval - (mut * interval))) 
+    τ = h_start : interval : nw
+
+    return constraint_minimum_up_time(pm, i, nw, τ)
+end
+
+function constraint_minimum_down_time(pm::_PM.AbstractPowerModel, i::Int, nw::Int = _PM.nw_id_default)
+    gen =_PM.ref(pm, nw, :gen, i)
+    mdt = gen["mdt"]
+    interval = pm.ref[:it][:pm][:number_of_contingencies]
+    h_start = max(1, (nw + interval - (mdt * interval))) 
+    τ = h_start : interval : nw
+
+    return constraint_minimum_down_time(pm, i, nw, τ)
+end
+
+function constraint_generator_ramping(pm::_PM.AbstractPowerModel, i::Int, nw::Int, previous_hour_network)
+    gen = _PM.ref(pm, nw, :gen, i)
+    Δt = _PM.ref(pm, nw, :frequency_parameters)["uc_time_interval"]
+    pmax = gen["pmax"]
+    pmin = gen["pmin"]
+    ΔPg_up = gen["ramp_rate"] * Δt * pmax
+    ΔPg_down = gen["ramp_rate"] * Δt * pmax
+
+    return constraint_generator_ramping(pm, i, nw, previous_hour_network, ΔPg_up, ΔPg_down, pmin)
 end

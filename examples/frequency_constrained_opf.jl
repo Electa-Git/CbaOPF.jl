@@ -25,6 +25,10 @@ CbaOPF.add_flexible_demand_data!(data)
 # Process inertia data
 CbaOPF.prepare_data!(data; t_hvdc = 0.10, ffr_cost = 50.0)
 
+number_of_hours = 1
+l_series = [1]
+g_series = [1]
+
 fmin = 49.0:0.05:49.8
 objective_no_dc = zeros(1, length(fmin))
 objective_dc = zeros(1, length(fmin))
@@ -39,9 +43,7 @@ for idx = 1:length(fmin)
     data["frequency_parameters"]["fmax"] =  data["frequency_parameters"]["f0"] + ((data["frequency_parameters"]["f0"] - fmin[idx]))
     data["frequency_parameters"]["t_fcr"] = 0.2
     # Add generator contingencies
-    mn_data = CbaOPF.create_contingencies(data)
-    # Process DC grid data
-    _PMACDC.process_additional_data!(mn_data)
+    mn_data = CbaOPF.create_multinetwork_model!(data, number_of_hours, g_series, l_series)
     # Provide addtional settings as part of the PowerModels settings dictionary
     s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => false)
     result_no_dc["$idx"] = CbaOPF.solve_fsopf(mn_data, _PM.DCPPowerModel, gurobi, setting = s, multinetwork = true)
