@@ -268,9 +268,9 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
             end
 
             if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             else
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             end
         end
     end
@@ -388,7 +388,7 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
             end
 
             if _PM.ref(pm, nw, :convdc, ccont)["zone"] == zone
-                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
+                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
             end
         end
     end
