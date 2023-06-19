@@ -14,6 +14,7 @@ Following problem types are implemented:
 - AC/DC grid OPF model with optimisation of HVDC converter set points, PST angles, demand response and load-shedding 
 - Redispatch cost minimization for fixed and variable HVDC converter set points
 - Start-up cost minimisation considering minimum inertia constraints
+- Frequency constrained OPF and UC problem considering HVDC inertia contribution
 
 ## How to use?
 

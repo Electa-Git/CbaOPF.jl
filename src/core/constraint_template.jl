@@ -255,21 +255,22 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
-            if haskey(generator_properties, i)
-                g_properties = generator_properties[i]
+            zone = _PM.ref(pm, nw, :zones, i)["zone"]
+            if haskey(generator_properties, zone)
+                g_properties = generator_properties[zone]
             else
                 g_properties = Dict()
             end
-            if haskey(zone_convs, i)
-                z_convs = zone_convs[i]
+            if haskey(zone_convs, zone)
+                z_convs = zone_convs[zone]
             else
                 z_convs = Dict()
             end
 
-            if _PM.ref(pm, nw, :gen, gcont)["zone"] == i
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
             else
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
             end
         end
     end
@@ -374,19 +375,20 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
-            if haskey(generator_properties, i)
-                g_properties = generator_properties[i]
+            zone = _PM.ref(pm, nw, :zones, i)["zone"]
+            if haskey(generator_properties, zone)
+                g_properties = generator_properties[zone]
             else
                 g_properties = Dict()
             end
-            if haskey(zone_convs, i)
-                z_convs = zone_convs[i]
+            if haskey(zone_convs, zone)
+                z_convs = zone_convs[zone]
             else
                 z_convs = Dict()
             end
 
-            if _PM.ref(pm, nw, :convdc, ccont)["zone"] == i
-                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            if _PM.ref(pm, nw, :convdc, ccont)["zone"] == zone
+                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, zone)
             end
         end
     end
