@@ -23,7 +23,7 @@ data = PowerModels.parse_file(file)
 # Process demand reduction and curtailment data
 CbaOPF.add_flexible_demand_data!(data)
 # Process inertia data
-CbaOPF.prepare_data!(data; t_hvdc = 0.10, ffr_cost = 50.0)
+CbaOPF.prepare_data!(data; uc = true, t_hvdc = 0.10, ffr_cost = 50.0)
 
 fmin = 49.0:0.05:49.8
 objective_no_dc = zeros(1, length(fmin))
@@ -73,12 +73,12 @@ end
 
 p1 = Plots.plot(fmin, objective_no_dc'/1e6, xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "without HVDC contribution")
 Plots.plot!(p1, fmin, objective_dc'/1e6,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "with HVDC contribution")
-Plots.plot!(p1, fmin, objective_no_dc_relax'/1e6,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "without HVDC contribution - relax")
-Plots.plot!(p1, fmin, objective_dc_relax'/1e6,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "with HVDC contribution - relax")
+# Plots.plot!(p1, fmin, objective_no_dc_relax'/1e6,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "without HVDC contribution - relax")
+# Plots.plot!(p1, fmin, objective_dc_relax'/1e6,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~M€\$", label = "with HVDC contribution - relax")
 plot_filename = joinpath(plot_path, "objective_comparison.pdf")
 Plots.savefig(p1, plot_filename)
 
-f_idx = 9
+f_idx = 17
 mn_data = CbaOPF.create_multinetwork_model!(data, number_of_hours, g_series, l_series)
 number_of_generators = length(data["gen"])
 alpha_dc = zeros(number_of_hours, number_of_generators)
@@ -129,6 +129,18 @@ p2 = Plots.plot(fmin, tie_line_flows, xlabel = "\$f_{min} in~Hz\$", ylabel = "\$
 Plots.plot!(p2, fmin, tie_line_flows_dc,  xlabel = "\$f_{min} in~Hz\$", ylabel = "\$Cost~in~€\$", label = "tie line flow zone 1 -> zone 2, with HVDC contribution")
 plot_filename = joinpath(plot_path, "tieline_flows.pdf")
 Plots.savefig(p2, plot_filename)
+
+
+res = result_no_dc["$f_idx"]
+res_dc = result_dc["$f_idx"]
+for g in sort(parse.(Int, collect(keys(res["solution"]["nw"]["1"]["gen"]))))
+    print("No HVDC: Generator, ", g, " dispatch = ", res["solution"]["nw"]["1"]["gen"]["$g"]["pg"], "\n")
+    print("With HVDC: Generator, ", g, " dispatch = ", res_dc["solution"]["nw"]["1"]["gen"]["$g"]["pg"], "\n")
+end
+for l in sort(parse.(Int, collect(keys(res["solution"]["nw"]["1"]["load"]))))
+    print("No HVDC: Load, ", l, " curtailment = ", res["solution"]["nw"]["1"]["load"]["$l"]["pcurt"], "\n")
+    print("With HVDC: Load, ", l, " curtailment = ", res_dc["solution"]["nw"]["1"]["load"]["$l"]["pcurt"], "\n")
+end
 
 # fmin_idx = f_idx
 # print("########### NO HVDC contribution for fmin = ", fmin[fmin_idx], " Hz #####################", "\n")

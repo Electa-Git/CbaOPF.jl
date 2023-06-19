@@ -21,6 +21,8 @@ data = prepare_test_data!("../test/data/case5_acdc_pst_3_grids.m")
 @testset "CbaOPF" begin
 
 include("cbaopf.jl")
+include("uc.jl")
+include("fs_opf.jl")
 
 
 end

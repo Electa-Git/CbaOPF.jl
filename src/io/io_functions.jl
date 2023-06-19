@@ -1,5 +1,5 @@
-function prepare_data!(data; borders = nothing, t_hvdc = nothing, ffr_cost = nothing)
-    prepare_generator_data!(data)
+function prepare_data!(data; borders = nothing, t_hvdc = nothing, ffr_cost = nothing, uc = false)
+    prepare_generator_data!(data; uc = uc)
 
     if !isnothing(borders)
         find_and_assign_xb_lines!(data, borders)
@@ -37,27 +37,28 @@ function prepare_data!(data; borders = nothing, t_hvdc = nothing, ffr_cost = not
         data["areas"] = Dict{String, Any}()
     end
 
-
     return data
 end
 
 
-function prepare_generator_data!(data)
+function prepare_generator_data!(data; uc = false)
     for (g, gen) in data["gen"]
         bus_id = gen["gen_bus"]
         gen["zone"] = data["bus"]["$bus_id"]["zone"]
         gen["area"] = data["bus"]["$bus_id"]["area"]
-        gen["start_up_cost"] = gen["startup"]
         gen["inertia_constants"] = data["inertia_constants"][g]["inertia_constant"]
-        gen["ramp_rate"] = data["inertia_constants"][g]["ramp_rate"]
-        if data["inertia_constants"][g]["inertia_constant"] <= 1
-            gen["mut"] = 1
-            gen["mdt"] = 1
-            gen["res"] = true
-        else
-            gen["mut"] = 3
-            gen["mdt"] = 4
-            gen["res"] = false
+        if uc == true
+            gen["start_up_cost"] = gen["startup"]
+            gen["ramp_rate"] = data["inertia_constants"][g]["ramp_rate"]
+            if data["inertia_constants"][g]["inertia_constant"] <= 1
+                gen["mut"] = 1
+                gen["mdt"] = 1
+                gen["res"] = true
+            else
+                gen["mut"] = 3
+                gen["mdt"] = 4
+                gen["res"] = false
+            end
         end
     end
 end

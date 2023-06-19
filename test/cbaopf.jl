@@ -59,7 +59,7 @@ s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fi
 
     @test isapprox(result["solution"]["gen"]["1"]["alpha_g"], 1.0, atol = 1e-3)
     @test isapprox(result["solution"]["gen"]["8"]["alpha_g"] - dataRD["gen"]["8"]["dispatch_status"], 0.0, atol = 1e-3)
-    @test isapprox(result["objective"], 800.0, atol = 1e-2)
+    @test isapprox(result["objective"], 1000.0, atol = 1e-2)
 end
 
 
