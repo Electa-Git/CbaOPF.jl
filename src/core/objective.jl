@@ -210,7 +210,7 @@ function objective_min_cost_frequency_uc(pm::_PM.AbstractPowerModel; report::Boo
         end
     end
 
-    load_cost_red, load_cost_curt = calc_load_operational_cost(pm)
+    load_cost_red, load_cost_curt = calc_load_operational_cost_uc(pm)
 
     return JuMP.@objective(pm.model, Min,
         sum( sum( gen_cost[(n,i)] for (i,gen) in _PM.nws(pm)[n][:gen]) for n in pm.ref[:it][:pm][:hour_ids]) 

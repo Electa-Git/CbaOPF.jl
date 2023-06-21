@@ -6,8 +6,6 @@ end
 function build_fsuc(pm::_PM.AbstractPowerModel)
     for (n, networks) in pm.ref[:it][:pm][:nw]
         _PM.variable_bus_voltage(pm; nw = n)
-        _PM.variable_gen_power(pm; nw = n)
-        _PM.variable_branch_power(pm; nw = n)
 
         _PMACDC.variable_active_dcbranch_flow(pm; nw = n)
         _PMACDC.variable_dcbranch_current(pm; nw = n)
@@ -17,9 +15,8 @@ function build_fsuc(pm::_PM.AbstractPowerModel)
         _PM.constraint_model_voltage(pm; nw = n)
         _PMACDC.constraint_voltage_dc(pm; nw = n)
 
-        variable_flexible_demand(pm; nw = n)
+
         variable_generator_states(pm; nw = n, uc = true)
-        variable_pst(pm; nw = n)
         variable_inertia(pm; nw = n)
         variable_hvdc_contribution(pm; nw = n)
     end
@@ -37,6 +34,10 @@ end
 
 
 function first_stage_model_uc!(pm, n)
+    _PM.variable_branch_power(pm; nw = n)
+    _PM.variable_gen_power(pm; nw = n)
+    variable_flexible_demand(pm; nw = n)
+    variable_pst(pm; nw = n)
     for i in _PM.ids(pm, n, :ref_buses)
         _PM.constraint_theta_ref(pm, i; nw = n)
     end
@@ -121,7 +122,6 @@ function second_stage_model_uc!(pm, n)
     
     # Binary generator status and on-off constraints -> for making UC problem later.....
     for i in _PM.ids(pm, n, :gen)
-        constraint_generator_on_off(pm, i; nw = n, use_status = false)
         constraint_generator_status_cont(pm, i; nw = n)
     end
 end
