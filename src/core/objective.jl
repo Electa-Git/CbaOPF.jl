@@ -199,8 +199,8 @@ function objective_min_cost_frequency_uc(pm::_PM.AbstractPowerModel; report::Boo
         end
     end
 
-    for (n, nw_ref) in _PM.nws(pm)
-        for (c, conv) in nw_ref[:convdc]
+    for n in pm.ref[:it][:pm][:cont_ids]
+        for (c, conv) in _PM.nws(pm)[n][:convdc]
             if n == 1
                 ffr_cost[(n,c)] = 0.0
             else
@@ -216,6 +216,6 @@ function objective_min_cost_frequency_uc(pm::_PM.AbstractPowerModel; report::Boo
         sum( sum( gen_cost[(n,i)] for (i,gen) in _PM.nws(pm)[n][:gen]) for n in pm.ref[:it][:pm][:hour_ids]) 
         + sum( sum( load_cost_curt[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
         + sum( sum( load_cost_red[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
-        + sum( sum( ffr_cost[(n,i)] for (i,conv) in nw_ref[:convdc]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( ffr_cost[(n,i)] for (i,conv) in _PM.nws(pm)[n][:convdc]) for n in pm.ref[:it][:pm][:cont_ids])
     )
 end

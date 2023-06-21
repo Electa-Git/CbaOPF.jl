@@ -12,7 +12,7 @@ import LaTeXStrings
 
 
 # Load test file
-file = "./test/data/case5_2grids_inertia_hvdc.m"
+file = "./test/data/case5_3grids_inertia_hvdc.m"
 plot_path = "/Users/hergun/Library/CloudStorage/OneDrive-KULeuven/Projects/HVDC_H2/plots"
 
 # Define solvers
