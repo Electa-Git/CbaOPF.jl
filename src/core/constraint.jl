@@ -75,7 +75,7 @@ end
 
 function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, gcont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
     ΔPg = _PM.var(pm, ref_id, :pg)[gcont]
-    alpha_g = _PM.var(pm, n, :alpha_g)
+    alpha_g = _PM.var(pm, ref_id, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot, zone)
     dc_contr = _PM.var(pm, n, :dc_contr, zone)
@@ -98,7 +98,7 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, genera
 end
 
 function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔT, f0, fmin, fmax,  zone_convs, hvdc_contribution, zone)
-    alpha_g = _PM.var(pm, n, :alpha_g)
+    alpha_g = _PM.var(pm, ref_id, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot, zone)
     dc_contr = _PM.var(pm, n, :dc_contr, zone)
@@ -120,8 +120,8 @@ function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, genera
 end
 
 function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, br_idx, area)
-    ΔP = _PM.var(pm, 1, :p)[br_idx]
-    alpha_g = _PM.var(pm, n, :alpha_g)
+    ΔP = _PM.var(pm, ref_id, :p)[br_idx]
+    alpha_g = _PM.var(pm, ref_id, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot_area, area)
     dc_contr = _PM.var(pm, n, :dc_contr_area, area)
@@ -147,8 +147,8 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel, n::Int, ref_i
 end
 
 function constraint_frequency_converter(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ccont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
-    ΔPc = - _PM.var(pm, 1, :pconv_ac)[ccont]
-    alpha_g = _PM.var(pm, n, :alpha_g)
+    ΔPc = - _PM.var(pm, ref_id, :pconv_ac)[ccont]
+    alpha_g = _PM.var(pm, ref_id, :alpha_g)
     pconv_in = _PM.var(pm, n, :pconv_in)
     htot = _PM.var(pm, n, :htot, zone)
     dc_contr = _PM.var(pm, n, :dc_contr, zone)
