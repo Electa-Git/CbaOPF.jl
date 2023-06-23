@@ -26,8 +26,8 @@ function build_zonal_tnep(pm::_PM.AbstractPowerModel)
             _PM.constraint_ohms_yt_from(pm, i; nw = n)
             _PM.constraint_ohms_yt_to(pm, i; nw = n)
             _PM.constraint_voltage_angle_difference(pm, i; nw = n)
-            constraint_variable_ntc_from(pm, i; nw = n)
-            constraint_variable_ntc_to(pm, i; nw = n)
+            constraint_variable_branch_capacity_from(pm, i; nw = n)
+            constraint_variable_branch_capacity_to(pm, i; nw = n)
         end
 
         for i in _PM.ids(pm, n, :load)
@@ -42,7 +42,7 @@ function build_zonal_tnep(pm::_PM.AbstractPowerModel)
     network_ids = sort(collect(_PM.nw_ids(pm)))
     for n in network_ids[2:end]
         for i in _PM.ids(pm, :branch, nw = n)
-            constraint_ntc_capacity(pm, i, nw = 2)
+            constraint_branch_capacity(pm, i, nw = n)
         end
     end
 

@@ -147,7 +147,7 @@ function constraint_active_conv_setpoint(pm::_PM.AbstractPowerModel, i::Int; nw:
     constraint_active_conv_setpoint(pm, nw, conv["index"], conv["P_g"])
 end
 
-function constraint_variable_ntc_from(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+function constraint_variable_branch_capacity_from(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     branch = _PM.ref(pm, nw, :branch, i)
     f_bus = branch["f_bus"]
     t_bus = branch["t_bus"]
@@ -155,10 +155,10 @@ function constraint_variable_ntc_from(pm::_PM.AbstractPowerModel, i::Int; nw::In
 
     pmax = branch["rate_a"]
 
-    constraint_variable_ntc_from(pm, nw, f_idx, pmax)
+    constraint_variable_branch_capacity_from(pm, nw, f_idx, pmax)
 end
 
-function constraint_variable_ntc_to(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+function constraint_variable_branch_capacity_to(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     branch = _PM.ref(pm, nw, :branch, i)
     f_bus = branch["f_bus"]
     t_bus = branch["t_bus"]
@@ -166,14 +166,15 @@ function constraint_variable_ntc_to(pm::_PM.AbstractPowerModel, i::Int; nw::Int=
 
     pmax = branch["rate_a"]
 
-    constraint_variable_ntc_to(pm, nw, t_idx, pmax)
+    constraint_variable_branch_capacity_to(pm, nw, t_idx, pmax)
 end
 
-function constraint_ntc_capacity(pm::_PM.AbstractAPLossLessModels, i::Int; nw::Int=_PM.nw_id_default)
+
+function constraint_branch_capacity(pm::_PM.AbstractAPLossLessModels, i::Int; nw::Int=_PM.nw_id_default)
     n = nw
     n_1 = n - 1
 
-    constraint_ntc_capacity(pm, i, n, n_1)
+    constraint_branch_capacity(pm, i, n, n_1)
 end
 
 

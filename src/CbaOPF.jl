@@ -18,6 +18,7 @@ include("prob/cba_opf.jl")
 include("prob/redispatch_opf.jl")
 include("prob/zonal_inertia_constrained_opf.jl")
 include("prob/zonal_tnep.jl")
+include("prob/nodal_tnep.jl")
 include("prob/fs_opf.jl")
 include("prob/fs_uc.jl")
 

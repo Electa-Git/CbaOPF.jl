@@ -73,6 +73,13 @@ function constraint_power_balance(pm::_PM.AbstractAPLossLessModels, n::Int, i::I
     end
 end
 
+function constraint_branch_capacity(pm::_PM.AbstractPowerModel, i::Int, n, n_1)
+    delta_cap_n = _PM.var(pm, n, :delta_cap, i)
+    delta_cap_n_1 = _PM.var(pm, n_1, :delta_cap, i)
+
+    JuMP.@constraint(pm.model, delta_cap_n == delta_cap_n_1)
+end
+
 function constraint_frequency(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, gcont, ΔT, f0, fmin, fmax, zone_convs, hvdc_contribution, zone)
     ΔPg = _PM.var(pm, ref_id, :pg)[gcont]
     alpha_g = _PM.var(pm, ref_id, :alpha_g)
