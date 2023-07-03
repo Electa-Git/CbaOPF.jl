@@ -29,26 +29,26 @@ highs = JuMP.optimizer_with_attributes(HiGHS.Optimizer)
     @testset "FS UC, no HVDC, no binary relaxation" begin
     s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => false, "relax_uc_binaries" => false)
     result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-    @test isapprox(result["objective"], 4.9465821165490985e7, atol = 1e3)
+    @test isapprox(result["objective"], 3.6150024502607435e7, atol = 1e3)
     end
 
     @testset "FS UC, with HVDC, no binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => false)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 1.3591379652516001e6, atol = 1e2)
+        @test isapprox(result["objective"], 1.3433753912636498e6, atol = 1e2)
     end
 
 
     @testset "FS UC, no HVDC, with binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => false, "relax_uc_binaries" => true)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 4.9465821165490985e7, atol = 1e3)
+        @test isapprox(result["objective"], 3.6150024502607435e7, atol = 1e3)
     end
         
     @testset "FS UC, with HVDC, with binary relaxation" begin
             s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => true)
             result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-            @test isapprox(result["objective"], 1.3591379652516001e6, atol = 1e2)
+            @test isapprox(result["objective"], 1.3433753912636498e6, atol = 1e2)
     end
 end
 
@@ -84,7 +84,7 @@ end
     @testset "FS UC, with HVDC, no binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => false)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 1.3332890178551567e6, atol = 1e2)
+        @test isapprox(result["objective"], 1.3301457120508624e6, atol = 1e2)
     end
 
 
@@ -97,7 +97,7 @@ end
     @testset "FS UC, with HVDC, with binary relaxation" begin
             s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => true)
             result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-            @test isapprox(result["objective"], 1.3332890178551567e6, atol = 1e2)
+            @test isapprox(result["objective"], 1.3301457120508624e6, atol = 1e2)
     end
 end
 
@@ -127,25 +127,25 @@ end
     @testset "FS UC, no HVDC, no binary relaxation" begin
     s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => false, "relax_uc_binaries" => false)
     result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-    @test isapprox(result["objective"], 1.523944513082387e8, atol = 1e3)
+    @test isapprox(result["objective"], 1.3641074331277716e8, atol = 1e3)
     end
 
     @testset "FS UC, with HVDC, no binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => false)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 1.5569885185627567e6, atol = 1e2)
+        @test isapprox(result["objective"], 1.5242321636853302e6, atol = 1e2)
     end
 
 
     @testset "FS UC, no HVDC, with binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => false, "relax_uc_binaries" => true)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 1.523944513082387e8, atol = 1e3)
+        @test isapprox(result["objective"], 1.3641074331277728e8, atol = 1e3)
     end
         
     @testset "FS UC, with HVDC, with binary relaxation" begin
             s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true, "relax_uc_binaries" => true)
             result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-            @test isapprox(result["objective"], 1.5569885185627567e6, atol = 1e2)
+            @test isapprox(result["objective"], 1.5242321636853302e6, atol = 1e2)
     end
 end

@@ -90,7 +90,7 @@ function second_stage_model!(pm, n)
         end
 
         for i in _PM.ids(pm, n, :branchdc)
-            if !isnothing(_PM.ref(pm, n, :contingency)["branch_id"]) &&  _PM.ref(pm, n, :contingency)["branch_id"] == i
+            if !isnothing(_PM.ref(pm, n, :contingency)["dcbranch_id"]) &&  _PM.ref(pm, n, :contingency)["dcbranch_id"] == i
                 constraint_dc_branch_contingency(pm, i; nw = n)
             else
                 _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)

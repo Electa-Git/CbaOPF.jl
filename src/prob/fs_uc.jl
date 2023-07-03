@@ -48,7 +48,7 @@ function first_stage_model_uc!(pm, n)
     for i in _PM.ids(pm, n, :branch)
         _PM.constraint_ohms_yt_from(pm, i; nw = n)
         _PM.constraint_ohms_yt_to(pm, i; nw = n)
-        _PM.constraint_voltage_angle_difference(pm, i; nw = n)
+         _PM.constraint_voltage_angle_difference(pm, i; nw = n)
         _PM.constraint_thermal_limit_from(pm, i; nw = n)
         _PM.constraint_thermal_limit_to(pm, i; nw = n)
     end
@@ -91,7 +91,7 @@ function second_stage_model_uc!(pm, n)
         end
 
         for i in _PM.ids(pm, n, :branchdc)
-            if !isnothing(_PM.ref(pm, n, :contingency)["branch_id"]) &&  _PM.ref(pm, n, :contingency)["branch_id"] == i
+            if !isnothing(_PM.ref(pm, n, :contingency)["dcbranch_id"]) &&  _PM.ref(pm, n, :contingency)["dcbranch_id"] == i
                 constraint_dc_branch_contingency(pm, i; nw = n)
             else
                 _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)
@@ -118,9 +118,4 @@ function second_stage_model_uc!(pm, n)
     for i in _PM.ids(pm, n, :convdc)
         constraint_converter_contribution_absolute(pm, i; nw = n)
     end
-    
-    # Binary generator status and on-off constraints -> for making UC problem later.....
-    # for i in _PM.ids(pm, n, :gen)
-    #     constraint_generator_status_cont(pm, i; nw = n)
-    # end
 end
