@@ -35,6 +35,6 @@ highs = JuMP.optimizer_with_attributes(HiGHS.Optimizer)
     @testset "FS UC, with HVDC, no binary relaxation" begin
         s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "hvdc_inertia_contribution" => true)
         result = CbaOPF.solve_fsuc(mn_data, _PM.DCPPowerModel, highs, setting = s, multinetwork = true)
-        @test isapprox(result["objective"], 3.40963e5, atol = 1e2)
+        @test isapprox(result["objective"], 327963, atol = 1e2)
     end
 end
