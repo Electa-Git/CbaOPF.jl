@@ -26,11 +26,11 @@ dataRD = CbaOPF.prepare_redispatch_data(resultOPF, data; contingency = contingen
 
 @testset "Redispatch OPF" begin
 # Provide settings for the optimisation problem, here we fix the HVDC converter set points
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
+s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => true, "inertia_limit" => false)
 # Run optimisation problem
 resultRD_no_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 # Now we allow the HVDC converter set points to be determined optimally
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
+s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
 resultRD_with_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 
 @test isapprox(resultRD_no_control["objective"] - resultRD_with_control["objective"] , 5485.38, atol = 1e-1)
@@ -43,7 +43,7 @@ inertia_limit = Dict(1 => Dict("limit" => 14.8), 2 => Dict("limit" => 0), 3 => D
 # we write the OPF results into the input data
 dataRD = CbaOPF.prepare_redispatch_data(resultOPF, data; inertia_limit = inertia_limit)
 # we update settings to include the inertia constraints
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
+s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
 #we perform the optimisation
 
 @testset "Inertia redispatch OPF" begin
@@ -53,7 +53,7 @@ s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fi
     # we write the OPF results into the input data
     dataRD = CbaOPF.prepare_redispatch_data(resultOPF, data; inertia_limit = inertia_limit)
     # we update settings to include the inertia constraints
-    s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
+    s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => true, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => true)
     #we perform the optimisation
     result = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 
@@ -66,7 +66,7 @@ end
 #### AC OPF problem
 
 # Provide addtional settings as part of the PowerModels settings dictionary
-s = Dict("output" => Dict("branch_flows" => true), "conv_losses_mp" => true, "fix_cross_border_flows" => false)
+s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => true, "fix_cross_border_flows" => false)
 
 ############ OPF problem ###############
 resultOPF = CbaOPF.solve_cbaopf(data, _PM.ACPPowerModel, ipopt; setting = s)

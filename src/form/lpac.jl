@@ -29,6 +29,11 @@ function constraint_power_balance_ac(pm::_PM.AbstractLPACModel, n::Int, i::Int, 
     sum(qg[g] for g in bus_gens)
     - sum(qflex[d] for d in bus_loads)
     + sum(bs for (i,bs) in bus_bs)*(1.0 + 2*phi))
+
+    if _IM.report_duals(pm)
+        _PM.sol(pm, n, :bus, i)[:lam_kcl_r] = cstr_p
+        _PM.sol(pm, n, :bus, i)[:lam_kcl_i] = cstr_q
+    end
 end
 
 function constraint_total_flexible_demand(pm::_PM.AbstractLPACModel, n::Int, i, pd, pf_angle)

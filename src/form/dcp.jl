@@ -58,6 +58,10 @@ function constraint_power_balance_ac(pm::_PM.AbstractDCPModel, n::Int, i::Int, b
         - sum(pflex[d] for d in bus_loads)
         - sum(gs for (i,gs) in bus_gs)*1^2
     )
+
+    if _IM.report_duals(pm)
+        _PM.sol(pm, n, :bus, i)[:lam_kcl_r] = cstr_p
+    end
 end
 
 function constraint_total_flexible_demand(pm::_PM.AbstractDCPModel, n::Int, i, pd, pf_angle)

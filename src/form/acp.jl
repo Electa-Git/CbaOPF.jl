@@ -81,6 +81,11 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
         - sum(qflex[d] for d in bus_loads)
         + sum(bs for (i,bs) in bus_bs)*vm^2
     )
+
+    if _IM.report_duals(pm)
+        _PM.sol(pm, n, :bus, i)[:lam_kcl_r] = cstr_p
+        _PM.sol(pm, n, :bus, i)[:lam_kcl_i] = cstr_q
+    end
 end
 
 
