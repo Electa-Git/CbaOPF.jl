@@ -114,6 +114,15 @@ function constraint_generator_on_off(pm::_PM.AbstractDCPModel, n::Int, i, pmax, 
     JuMP.@constraint(pm.model,  alpha_g >= status)
 end
 
+function constraint_generator_on_off(pm::_PM.AbstractDCPModel, n::Int, nw_ref, i, pmax, pmin, status)
+    pg = _PM.var(pm, n, :pg, i)
+    alpha_g = _PM.var(pm, nw_ref, :alpha_g, i)
+
+    JuMP.@constraint(pm.model,  pg <= pmax * alpha_g)
+    JuMP.@constraint(pm.model,  pg >= pmin * alpha_g)
+    JuMP.@constraint(pm.model,  alpha_g >= status)
+end
+
 function constraint_variable_branch_capacity_from(pm::_PM.AbstractDCPModel, n::Int, f_idx, pmax)
     l,i,j = f_idx
     p_fr = _PM.var(pm, n, :p, (l,i,j))

@@ -21,6 +21,7 @@ include("prob/zonal_tnep.jl")
 include("prob/nodal_tnep.jl")
 include("prob/fs_opf.jl")
 include("prob/fs_uc.jl")
+include("prob/fs_uc_droop.jl")
 
 include("core/variable.jl")
 include("core/base.jl")

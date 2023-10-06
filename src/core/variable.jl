@@ -204,6 +204,23 @@ function variable_generator_state(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     report && _PM.sol_component_value(pm, nw, :gen, :alpha_g, _PM.ids(pm, nw, :gen), alpha_g)
 end
 
+"Variable for generator state"
+function variable_generator_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    rg = _PM.var(pm, nw)[:rg] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_rg",
+        start = 0
+    )
+
+    if bounded
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            JuMP.set_lower_bound(rg[g], 0)
+            JuMP.set_upper_bound(rg[g], gen["ramp_rate"] / (3600))
+        end
+    end
+
+    report && _PM.sol_component_value(pm, nw, :gen, :rg, _PM.ids(pm, nw, :gen), rg)
+end
+
 "Variable for minimum up-time"
 function variable_generator_state_mut(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     beta_g = _PM.var(pm, nw)[:beta_g] = JuMP.@variable(pm.model,
@@ -343,10 +360,27 @@ function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_i
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in, _PM.ids(pm, nw, :convdc), Δpconv)
 end
 
+"Variable to model the converter ramp rate"
+function variable_converter_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    rdc = _PM.var(pm, nw)[:rdc] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_rdc",
+    start = 0
+    )
+
+    if bounded
+        for (c, convdc) in _PM.ref(pm, nw, :convdc)
+            JuMP.set_lower_bound(rdc[c],  -convdc["rmax"])
+            JuMP.set_upper_bound(rdc[c],   convdc["rmax"])
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :rdc, _PM.ids(pm, nw, :convdc), rdc)
+end
+
 "Variable to represent absolute value HVDC converter inertia provision for the objective"
 function variable_converter_inertia_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
     Δpconv_abs = _PM.var(pm, nw)[:pconv_in_abs] = JuMP.@variable(pm.model,
-    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_pconv_in",
+    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_pconv_in_abs",
     start = _PM.comp_start_value(_PM.ref(pm, nw, :convdc, i), "P_g", 1.0)
     )
 
@@ -358,6 +392,50 @@ function variable_converter_inertia_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.
     end
 
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pconv_in_abs, _PM.ids(pm, nw, :convdc), Δpconv_abs)
+end
+
+function variable_gen_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
+    variable_gen_droop(pm, nw = nw)
+    variable_gen_droop_abs(pm, nw = nw)
+    # variable_total_gen_droop(pm, nw = nw)
+    # variable_total_gen_droop_tie_line(pm, nw = nw)
+end
+
+function variable_gen_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    pg_droop = _PM.var(pm, nw)[:pg_droop] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_pg_droop",
+    start = 0
+    )
+
+    if bounded
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if gen["fcr_contribution"] == true
+                JuMP.set_lower_bound(pg_droop[g],  - 2 * gen["pmax"])
+                JuMP.set_upper_bound(pg_droop[g],    2 * gen["pmax"])
+            else
+                JuMP.set_lower_bound(pg_droop[g],  0)
+                JuMP.set_upper_bound(pg_droop[g],  0)
+            end
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :gen, :pg_droop, _PM.ids(pm, nw, :gen), pg_droop)
+end
+
+function variable_gen_droop_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    Δpg_abs = _PM.var(pm, nw)[:pg_droop_abs] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_pg_droop_abs",
+    start = 0
+    )
+
+    if bounded
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            JuMP.set_lower_bound(Δpg_abs[g],  0)
+            JuMP.set_upper_bound(Δpg_abs[g],  2 * gen["pmax"])
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pg_droop_abs, _PM.ids(pm, nw, :gen), Δpg_abs)
 end
 
 function variable_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)

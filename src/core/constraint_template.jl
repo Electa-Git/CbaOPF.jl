@@ -112,7 +112,7 @@ function constraint_inertia_limit(pm::_PM.AbstractPowerModel, i::Int; nw::Int = 
     # end
 end
 
-function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default, use_status = true)
+function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default, use_status = true, second_stage = false)
     gen     = _PM.ref(pm, nw, :gen, i)
     pmax = gen["pmax"]
     pmin = gen["pmin"]
@@ -122,7 +122,12 @@ function constraint_generator_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int
         status = 0
     end
 
-    constraint_generator_on_off(pm, nw, i, pmax, pmin, status)
+    if second_stage == false
+        constraint_generator_on_off(pm, nw, i, pmax, pmin, status)
+    else
+        nw_ref = get_reference_network_id(pm, nw)
+        constraint_generator_on_off(pm, nw, nw_ref, i, pmax, pmin, status)
+    end
 end
 
 function constraint_generator_status(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
@@ -482,3 +487,282 @@ function constraint_generator_ramping(pm::_PM.AbstractPowerModel, i::Int, nw::In
 
     return constraint_generator_ramping(pm, i, nw, previous_hour_network, ΔPg_up, ΔPg_down, pmin)
 end
+
+function constraint_frequency_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    if !isnothing(_PM.ref(pm, nw, :contingency)["gen_id"])
+        gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone")
+                zone = gen["zone"]
+                if !haskey(generator_properties, zone)
+                    generator_properties[zone] = Dict()
+                end
+                if g != gcont
+                    push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+                else
+                    push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+                end
+            end
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone")
+                zone = conv["zone"] 
+                if !haskey(zone_convs, zone)
+                    zone_convs[zone] = Dict()
+                end
+                push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+            end
+        end
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔTin = frequency_parameters["t_fcr"]
+        ΔTdroop = frequency_parameters["t_fcrd"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+
+        zones = [i for i in _PM.ids(pm, nw, :zones)]
+        for i in zones
+            zone = _PM.ref(pm, nw, :zones, i)["zone"]
+            if haskey(generator_properties, zone)
+                g_properties = generator_properties[zone]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, zone)
+                z_convs = zone_convs[zone]
+            else
+                z_convs = Dict()
+            end
+
+            if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
+                constraint_frequency_droop(pm, nw, reference_network_idx, g_properties, gcont, ΔTin, ΔTdroop, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            else
+                constraint_frequency_droop(pm, nw, reference_network_idx, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            end
+        end
+    end
+end
+
+function constraint_frequency_tie_line_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    if !isnothing(_PM.ref(pm, nw, :contingency)["branch_id"])
+        bcont = _PM.ref(pm, nw, :contingency)["branch_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "area")
+                area = gen["area"]
+                if !haskey(generator_properties, area)
+                    generator_properties[area] = Dict()
+                end
+                push!(generator_properties[area], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+            end
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "area")
+                area = conv["area"] 
+                if !haskey(zone_convs, area)
+                    zone_convs[area] = Dict()
+                end
+                push!(zone_convs[area], c => Dict("t_hvdc" => conv["t_hvdc"]))
+            end
+        end
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔTin = frequency_parameters["t_fcr"]
+        ΔTdroop = frequency_parameters["t_fcrd"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+
+        tie_line = _PM.ref(pm, nw, :tie_lines)[bcont]
+        br_id = tie_line["br_idx"]
+        f_idx = _PM.ref(pm, nw, :branch)[br_id]["f_bus"]
+        t_idx = _PM.ref(pm, nw, :branch)[br_id]["t_bus"]
+        area_fr = tie_line["area_fr"]
+        area_to = tie_line["area_to"]
+        areas = [area_fr area_to]
+        for i in areas
+            if i == area_fr
+                br_idx = (br_id, f_idx, t_idx)
+            else
+                br_idx = (br_id, t_idx, f_idx)
+            end
+            if haskey(generator_properties, i)
+                g_properties = generator_properties[i]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, i)
+                z_convs = zone_convs[i]
+            else
+                z_convs = Dict()
+            end
+
+            constraint_frequency_tie_line_droop(pm, nw, reference_network_idx, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, z_convs, hvdc_contribution, br_idx, i)
+        end
+    end
+end
+
+function constraint_frequency_converter_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    if !isnothing(_PM.ref(pm, nw, :contingency)["conv_id"])
+        ccont = _PM.ref(pm, nw, :contingency)["conv_id"]
+        generator_properties = Dict()
+        zone_convs = Dict()
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone")
+                zone = gen["zone"]
+                if !haskey(generator_properties, zone)
+                    generator_properties[zone] = Dict()
+                end
+                push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+            end
+        end
+
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone")
+                zone = conv["zone"] 
+                if !haskey(zone_convs, zone)
+                    zone_convs[zone] = Dict()
+                end
+                if c != ccont
+                    push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+                end
+            end
+        end
+
+        frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+        ΔTin = frequency_parameters["t_fcr"]
+        ΔTdroop = frequency_parameters["t_fcrd"]
+        fmin = frequency_parameters["fmin"]
+        fmax = frequency_parameters["fmax"]
+        f0 = frequency_parameters["f0"]
+
+        zones = [i for i in _PM.ids(pm, nw, :zones)]
+        for i in zones
+            zone = _PM.ref(pm, nw, :zones, i)["zone"]
+            if haskey(generator_properties, zone)
+                g_properties = generator_properties[zone]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, zone)
+                z_convs = zone_convs[zone]
+            else
+                z_convs = Dict()
+            end
+
+            if _PM.ref(pm, nw, :convdc, ccont)["zone"] == zone
+                constraint_frequency_converter_droop(pm, nw, reference_network_idx , g_properties, ccont, ΔTin, ΔTdroop, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+            end
+        end
+    end
+end
+
+function constraint_gen_droop_power_balance(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    constraint_gen_droop_power_balance(pm, i, nw, reference_network_idx)
+end
+
+
+function constraint_generator_droop(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    gen = _PM.ref(pm, nw, :gen, i)
+    ramp_rate = gen["ramp_rate_per_s"]
+
+    ΔTin = _PM.ref(pm, nw, :frequency_parameters)["t_fcr"]
+    ΔTdroop = _PM.ref(pm, nw, :frequency_parameters)["t_fcrd"]
+
+    return constraint_generator_droop(pm, i, nw, ramp_rate, ΔTin, ΔTdroop)
+end
+
+function constraint_generator_droop_absolute(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    constraint_generator_droop_absolute(pm, i, nw)
+end
+
+
+
+
+
+
+
+
+
+
+
+# function constraint_frequency_inertia(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+#     reference_network_idx = get_reference_network_id(pm, nw)
+
+#     if !isnothing(_PM.ref(pm, nw, :contingency)["gen_id"])
+#         gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
+#         generator_properties = Dict()
+#         zone_convs = Dict()
+#         for (g, gen) in _PM.ref(pm, nw, :gen)
+#             if haskey(gen, "zone")
+#                 zone = gen["zone"]
+#                 if !haskey(generator_properties, zone)
+#                     generator_properties[zone] = Dict()
+#                 end
+#                 if g != gcont
+#                     push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+#                 else
+#                     push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
+#                 end
+#             end
+#         end
+
+#         for (c, conv) in _PM.ref(pm, nw, :convdc)
+#             if haskey(conv, "zone")
+#                 zone = conv["zone"] 
+#                 if !haskey(zone_convs, zone)
+#                     zone_convs[zone] = Dict()
+#                 end
+#                 push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"], "pmax" => conv["Pacmax"], "pmax" => conv["Pacmin"]))
+#             end
+#         end
+
+#         frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+#         Tfcr = frequency_parameters["t_fcr"]
+#         Tfcrd = frequency_parameters["t_fcr"]
+#         fmin = frequency_parameters["fmin"]
+#         fmax = frequency_parameters["fmax"]
+#         f0 = frequency_parameters["f0"]
+
+#         zones = [i for i in _PM.ids(pm, nw, :zones)]
+#         for i in zones
+#             zone = _PM.ref(pm, nw, :zones, i)["zone"]
+#             if haskey(generator_properties, zone)
+#                 g_properties = generator_properties[zone]
+#             else
+#                 g_properties = Dict()
+#             end
+#             if haskey(zone_convs, zone)
+#                 z_convs = zone_convs[zone]
+#             else
+#                 z_convs = Dict()
+#             end
+
+#             if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
+#                 constraint_frequency_inertia(pm, nw, reference_network_idx, g_properties, gcont, Tfcr, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+#             else
+#                 constraint_frequency_inertia(pm, nw, reference_network_idx, g_properties, Tfcr, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+#             end
+#         end
+#     end
+# end
+
+# function constraint_converter_power_balance_ramp(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+#     reference_network_idx = get_reference_network_id(pm, nw)
+
+#     constraint_converter_power_balance_ramp(pm, i, nw, reference_network_idx)
+# end
