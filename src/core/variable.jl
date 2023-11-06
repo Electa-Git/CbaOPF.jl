@@ -121,7 +121,9 @@ end
 function variable_total_flex_demand_reactive(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     qflex = _PM.var(pm, nw)[:qflex] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :load)], base_name="$(nw)_qflex",
-        start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "qd")
+        start = _PM.comp_start_value(_PM.ref(pm, nw, :load, i), "qd"),
+        lower_bound = -max(0, _PM.ref(pm, nw, :load, i, "qd")),
+        upper_bound =  max(0, _PM.ref(pm, nw, :load, i, "qd")),
     )
     report && _PM.sol_component_value(pm, nw, :load, :qflex, _PM.ids(pm, nw, :load), qflex)
 end
@@ -179,8 +181,8 @@ function variable_redispacth_down(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_
     report && _PM.sol_component_value(pm, nw, :gen, :dpg_down, _PM.ids(pm, nw, :gen), dpg_down)
 end
 
-function variable_generator_states(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, uc = false)
-    variable_generator_state(pm, nw = nw)
+function variable_generator_states(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, uc = false, res_on = false, all_on = false)
+    variable_generator_state(pm, nw = nw; res_on = res_on, all_on = all_on)
     if uc == true
         if haskey(pm.setting, "relax_uc_binaries") && pm.setting["relax_uc_binaries"] == true
             variable_generator_state_mut_relax(pm, nw = nw)
@@ -195,30 +197,32 @@ end
 
 
 "Variable for generator state"
-function variable_generator_state(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+function variable_generator_state(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true, res_on = false, all_on = false)
     alpha_g = _PM.var(pm, nw)[:alpha_g] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_alpha_g",
         binary = true,
-        start = 0
+        start = 0,
+        upper_bound = 1,
+        lower_bound = 0,
     )
-    report && _PM.sol_component_value(pm, nw, :gen, :alpha_g, _PM.ids(pm, nw, :gen), alpha_g)
-end
-
-"Variable for generator state"
-function variable_generator_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
-    rg = _PM.var(pm, nw)[:rg] = JuMP.@variable(pm.model,
-        [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_rg",
-        start = 0
-    )
-
-    if bounded
-        for (g, gen) in _PM.ref(pm, nw, :gen)
-            JuMP.set_lower_bound(rg[g], 0)
-            JuMP.set_upper_bound(rg[g], gen["ramp_rate"] / (3600))
+    
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if res_on == true && (gen["type"] == "Wind" || gen["type"] == "Solar")
+            JuMP.set_lower_bound(alpha_g[g], 1)
+            JuMP.set_upper_bound(alpha_g[g], 1)
+        elseif gen["pmax"] == 0
+            JuMP.set_lower_bound(alpha_g[g], 0)
+            JuMP.set_upper_bound(alpha_g[g], 0)
+        # elseif gen["mut"] == 1 && gen["mdt"] == 1 && gen["cost"][2] == 0.0 && gen["start_up_cost"] == 0.0 # generators without any auxiliary cost & start-up cost can always be online
+        #     JuMP.set_lower_bound(alpha_g[g], 1)
+        #     JuMP.set_upper_bound(alpha_g[g], 1)
+        end
+        if all_on == true
+            JuMP.set_lower_bound(alpha_g[g], 1)
+            JuMP.set_upper_bound(alpha_g[g], 1)
         end
     end
-
-    report && _PM.sol_component_value(pm, nw, :gen, :rg, _PM.ids(pm, nw, :gen), rg)
+    report && _PM.sol_component_value(pm, nw, :gen, :alpha_g, _PM.ids(pm, nw, :gen), alpha_g)
 end
 
 "Variable for minimum up-time"
@@ -226,7 +230,9 @@ function variable_generator_state_mut(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw
     beta_g = _PM.var(pm, nw)[:beta_g] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_beta_g",
         binary = true,
-        start = 0
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
     )
     report && _PM.sol_component_value(pm, nw, :gen, :beta_g, _PM.ids(pm, nw, :gen), beta_g)
 end
@@ -236,7 +242,9 @@ function variable_generator_state_mdt(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw
     gamma_g = _PM.var(pm, nw)[:gamma_g] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_gamma_g",
         binary = true,
-        start = 0
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
     )
     report && _PM.sol_component_value(pm, nw, :gen, :gamma_g, _PM.ids(pm, nw, :gen), gamma_g)
 end
@@ -347,7 +355,7 @@ end
 function variable_converter_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
     Δpconv = _PM.var(pm, nw)[:pconv_in] = JuMP.@variable(pm.model,
     [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_pconv_in",
-    start = _PM.comp_start_value(_PM.ref(pm, nw, :convdc, i), "P_g", 1.0)
+    start = _PM.comp_start_value(_PM.ref(pm, nw, :convdc, i), "P_g", 0.0)
     )
 
     if bounded
@@ -435,7 +443,7 @@ function variable_gen_droop_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_de
         end
     end
 
-    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :convdc, :pg_droop_abs, _PM.ids(pm, nw, :gen), Δpg_abs)
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :gen, :pg_droop_abs, _PM.ids(pm, nw, :gen), Δpg_abs)
 end
 
 function variable_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
@@ -511,3 +519,22 @@ function variable_total_hvdc_inertia_tie_line(pm::_PM.AbstractPowerModel; nw::In
 
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :areas, :dc_contr, _PM.ids(pm, nw, :areas), dc_contr_area)
 end
+
+
+
+# "Variable for generator state"
+# function variable_generator_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+#     rg = _PM.var(pm, nw)[:rg] = JuMP.@variable(pm.model,
+#         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_rg",
+#         start = 0
+#     )
+
+#     if bounded
+#         for (g, gen) in _PM.ref(pm, nw, :gen)
+#             JuMP.set_lower_bound(rg[g], 0)
+#             JuMP.set_upper_bound(rg[g], gen["ramp_rate"] / (3600))
+#         end
+#     end
+
+#     report && _PM.sol_component_value(pm, nw, :gen, :rg, _PM.ids(pm, nw, :gen), rg)
+# end

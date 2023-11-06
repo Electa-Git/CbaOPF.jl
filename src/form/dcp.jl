@@ -139,3 +139,23 @@ function constraint_variable_branch_capacity_to(pm::_PM.AbstractDCPModel, n::Int
 
     JuMP.@constraint(pm.model, p_to <=  (pmax + delta_cap))
 end
+
+function constraint_dc_branch_contingency(pm::_PM.AbstractPowerModel, n::Int, f_idx, t_idx)
+    p_fr = _PM.var(pm, n, :p_dcgrid, f_idx)
+    p_to = _PM.var(pm, n, :p_dcgrid, t_idx)
+
+    JuMP.@constraint(pm.model, p_fr == 0)
+    JuMP.@constraint(pm.model, p_to == 0)
+end
+
+function constraint_dc_conv_contingency(pm::_PM.AbstractPowerModel, n::Int, i)
+    p_conv = _PM.var(pm, n, :pconv_tf_fr, i)
+    p_conv_in = _PM.var(pm, n, :pconv_in, i)
+    p_conv_abs = _PM.var(pm, n, :pconv_in_abs, i)
+    p_dc = _PM.var(pm, n, :pconv_dc, i)
+
+    JuMP.@constraint(pm.model, p_conv == 0)
+    JuMP.@constraint(pm.model, p_conv_in == 0)
+    JuMP.@constraint(pm.model, p_conv_abs == 0)
+    JuMP.@constraint(pm.model, p_dc == 0)
+end

@@ -36,7 +36,7 @@ function first_stage_model_uc_droop!(pm, n)
     _PM.variable_branch_power(pm; nw = n)
     variable_flexible_demand(pm; nw = n)
     variable_pst(pm; nw = n)
-    variable_generator_states(pm; nw = n, uc = true)
+    variable_generator_states(pm; nw = n, uc = true, res_on = true, all_on = false)
     for i in _PM.ids(pm, n, :ref_buses)
         _PM.constraint_theta_ref(pm, i; nw = n)
     end
@@ -99,12 +99,16 @@ function second_stage_model_uc_droop!(pm, n)
         end
 
         for i in _PM.ids(pm, n, :convdc)
-            _PMACDC.constraint_converter_losses(pm, i; nw = n)
-            _PMACDC.constraint_converter_current(pm, i; nw = n)
-            _PMACDC.constraint_conv_transformer(pm, i; nw = n)
-            _PMACDC.constraint_conv_reactor(pm, i; nw = n)
-            _PMACDC.constraint_conv_filter(pm, i; nw = n)
-            constraint_converter_power_balance(pm, i; nw = n)
+            if !isnothing(_PM.ref(pm, n, :contingency)["conv_id"]) &&  _PM.ref(pm, n, :contingency)["conv_id"] == i
+                constraint_dc_conv_contingency(pm, i; nw = n)
+            else
+                _PMACDC.constraint_converter_losses(pm, i; nw = n)
+                _PMACDC.constraint_converter_current(pm, i; nw = n)
+                _PMACDC.constraint_conv_transformer(pm, i; nw = n)
+                _PMACDC.constraint_conv_reactor(pm, i; nw = n)
+                _PMACDC.constraint_conv_filter(pm, i; nw = n)
+                constraint_converter_power_balance(pm, i; nw = n)
+            end
         end
         constraint_frequency_droop(pm; nw = n, hvdc_contribution = true)
         constraint_frequency_tie_line_droop(pm; nw = n, hvdc_contribution = true)
