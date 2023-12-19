@@ -70,8 +70,9 @@ function first_stage_model_uc_droop!(pm, n)
         constraint_total_flexible_demand(pm, i; nw = n)
     end
 
+    gen_status = haskey(pm.setting, "use_gen_status") && pm.setting["use_gen_status"] == true
     for i in _PM.ids(pm, n, :gen)
-        constraint_generator_on_off(pm, i; nw = n, use_status = false) 
+        constraint_generator_on_off(pm, i; nw = n, use_status = gen_status) 
         contstraint_unit_commitment(pm, i; nw = n)
     end
 
@@ -79,57 +80,5 @@ function first_stage_model_uc_droop!(pm, n)
         constraint_ohms_y_from_pst(pm, i; nw = n)
         constraint_ohms_y_to_pst(pm, i; nw = n)
         constraint_limits_pst(pm, i; nw = n)
-    end
-end
-
-
-function second_stage_model_uc_droop!(pm, n)
-    if haskey(pm.setting, "hvdc_inertia_contribution") && pm.setting["hvdc_inertia_contribution"] == true
-    # converter equations to make sure that we have power balance....
-        for i in _PM.ids(pm, n, :busdc)
-            _PMACDC.constraint_power_balance_dc(pm, i; nw = n)
-        end
-
-        for i in _PM.ids(pm, n, :branchdc)
-            if !isnothing(_PM.ref(pm, n, :contingency)["dcbranch_id"]) &&  _PM.ref(pm, n, :contingency)["dcbranch_id"] == i
-                constraint_dc_branch_contingency(pm, i; nw = n)
-            else
-                _PMACDC.constraint_ohms_dc_branch(pm, i; nw = n)
-            end
-        end
-
-        for i in _PM.ids(pm, n, :convdc)
-            if !isnothing(_PM.ref(pm, n, :contingency)["conv_id"]) &&  _PM.ref(pm, n, :contingency)["conv_id"] == i
-                constraint_dc_conv_contingency(pm, i; nw = n)
-            else
-                _PMACDC.constraint_converter_losses(pm, i; nw = n)
-                _PMACDC.constraint_converter_current(pm, i; nw = n)
-                _PMACDC.constraint_conv_transformer(pm, i; nw = n)
-                _PMACDC.constraint_conv_reactor(pm, i; nw = n)
-                _PMACDC.constraint_conv_filter(pm, i; nw = n)
-                constraint_converter_power_balance(pm, i; nw = n)
-            end
-        end
-        constraint_frequency_droop(pm; nw = n, hvdc_contribution = true)
-        constraint_frequency_tie_line_droop(pm; nw = n, hvdc_contribution = true)
-        constraint_frequency_converter_droop(pm; nw = n, hvdc_contribution = true)
-    else
-        constraint_frequency_droop(pm; nw = n, hvdc_contribution = false)
-        constraint_frequency_tie_line_droop(pm; nw = n, hvdc_contribution = false)
-        constraint_frequency_converter_droop(pm; nw = n, hvdc_contribution = false)
-    end
-
-    for i in _PM.ids(pm, n, :gen)
-        constraint_generator_on_off(pm, i; nw = n, use_status = false, second_stage = true)
-        constraint_gen_droop_power_balance(pm, i; nw = n)
-        constraint_generator_droop(pm, i; nw = n)
-    end
-
-    for i in _PM.ids(pm, n, :convdc)
-        constraint_converter_contribution_absolute(pm, i; nw = n)
-    end
-
-    for i in _PM.ids(pm, n, :gen)
-        constraint_generator_droop_absolute(pm, i; nw = n)
     end
 end
