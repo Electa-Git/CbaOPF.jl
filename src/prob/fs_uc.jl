@@ -32,12 +32,14 @@ function build_fsuc(pm::_PM.AbstractPowerModel)
         for n in pm.ref[:it][:pm][:cont_ids]
             second_stage_model_uc_droop!(pm, n)
         end
+        objective_min_cost_frequency_uc(pm; droop = true)
     else
         for n in pm.ref[:it][:pm][:cont_ids]
             second_stage_model_uc!(pm, n)
         end
+        objective_min_cost_frequency_uc(pm; droop = false)
     end
-    objective_min_cost_frequency_uc(pm)
+    
 end
 
 

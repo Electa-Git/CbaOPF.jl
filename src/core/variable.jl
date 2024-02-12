@@ -155,12 +155,12 @@ end
 
 "Collect redispatch variables"
 function variable_gen_redispatch(pm; kwargs...)
-    variable_redispacth_up(pm, kwargs...)
-    variable_redispacth_down(pm, kwargs...)
+    variable_redispatch_up(pm; kwargs...)
+    variable_redispatch_down(pm; kwargs...)
 end
 
 "Variable for upwards generator redispatch each time step"
-function variable_redispacth_up(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+function variable_redispatch_up(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     dpg_up = _PM.var(pm, nw)[:dpg_up] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_dpg_up",
         lower_bound = 0,
@@ -171,7 +171,7 @@ function variable_redispacth_up(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_de
 end
 
 "Variable for upwards generator redispatch each time step"
-function variable_redispacth_down(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+function variable_redispatch_down(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     dpg_down = _PM.var(pm, nw)[:dpg_down] = JuMP.@variable(pm.model,
         [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_dpg_down",
         lower_bound = 0,

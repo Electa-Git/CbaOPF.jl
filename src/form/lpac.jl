@@ -49,6 +49,17 @@ function constraint_total_flexible_demand(pm::_PM.AbstractLPACModel, n::Int, i, 
     JuMP.@constraint(pm.model, qflex == tan(pf_angle) * pflex)
 end
 
+function constraint_total_fixed_demand(pm::_PM.AbstractLPACModel, n::Int, i, pd, pf_angle)
+    pflex       = _PM.var(pm, n, :pflex, i)
+    qflex       = _PM.var(pm, n, :qflex, i)
+
+    # Active power demand is the reference demand `pd` plus the contributions from all the demand flexibility decision variables
+    JuMP.@constraint(pm.model, pflex == pd)
+
+    # Reactive power demand is given by the active power demand and the power factor angle of the load
+    JuMP.@constraint(pm.model, qflex == tan(pf_angle) * pflex)
+end
+
 # To Do: PST constraints for LPAC.
 function constraint_ohms_y_from_pst(pm::_PM.AbstractLPACModel, n::Int, i::Int, f_bus, t_bus, f_idx, t_idx, g, b, g_fr, b_fr)
     alpha = _PM.var(pm, n,  :psta, i)

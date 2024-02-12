@@ -49,3 +49,14 @@ function constraint_total_flexible_demand(pm::_PM.AbstractWModels, n::Int, i, pd
     # Reactive power demand is given by the active power demand and the power factor angle of the load
     JuMP.@constraint(pm.model, qflex == tan(pf_angle) * pflex)
 end
+
+function constraint_total_fixed_demand(pm::_PM.AbstractWModels, n::Int, i, pd, pf_angle)
+    pflex       = _PM.var(pm, n, :pflex, i)
+    qflex       = _PM.var(pm, n, :qflex, i)
+
+    # Active power demand is the reference demand `pd` plus the contributions from all the demand flexibility decision variables
+    JuMP.@constraint(pm.model, pflex == pd)
+
+    # Reactive power demand is given by the active power demand and the power factor angle of the load
+    JuMP.@constraint(pm.model, qflex == tan(pf_angle) * pflex)
+end

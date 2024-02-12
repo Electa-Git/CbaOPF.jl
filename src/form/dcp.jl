@@ -73,6 +73,12 @@ function constraint_total_flexible_demand(pm::_PM.AbstractDCPModel, n::Int, i, p
     JuMP.@constraint(pm.model, pflex == pd - pcurt - pred)
 end
 
+function constraint_total_fixed_demand(pm::_PM.AbstractDCPModel, n::Int, i, pd, pf_angle)
+    pflex       = _PM.var(pm, n, :pflex, i)
+
+    # Active power demand is the reference demand `pd` plus the contributions from all the demand flexibility decision variables
+    JuMP.@constraint(pm.model, pflex == pd)
+end
 
 function constraint_fixed_xb_flows(pm::_PM.AbstractDCPModel, n::Int, xb_lines, xb_convs, flow, slack)
     p    = _PM.var(pm, n, :p)

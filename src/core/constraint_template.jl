@@ -56,6 +56,12 @@ function constraint_total_flexible_demand(pm::_PM.AbstractPowerModel, i::Int; nw
     constraint_total_flexible_demand(pm, nw, i, pd, pf_angle)
 end
 
+function constraint_total_fixed_demand(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
+    load     = _PM.ref(pm, nw, :load, i)
+    pd       = load["pd"]
+    pf_angle = _FP.get(load, "pf_angle", 0.0) # Power factor angle, in radians
+    constraint_total_fixed_demand(pm, nw, i, pd, pf_angle)
+end
 
 function constraint_fixed_xb_flows(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
     xb_line_dict = _PM.ref(pm, nw, :borders, i, "xb_lines")
