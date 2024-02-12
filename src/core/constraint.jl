@@ -280,6 +280,12 @@ function constraint_generator_ramping(pm::_PM.AbstractPowerModel, i::Int, n::Int
     JuMP.@constraint(pm.model, pg_n_1 - pg_n <= ΔPg_down * alpha_n + pmin * gamma_n)
 end
 
+function  constraint_unit_commitment_reserves(pm::_PM.AbstractPowerModel, i::Int, n::Int)
+    pg = _PM.var(pm, n, :pg, i)
+  
+    JuMP.@constraint(pm.model, sum([gen["pmax"] * _PM.var(pm, n, :alpha_g, g) for (g, gen) in _PM.ref(pm, n, :gen)]) >= pg)
+end
+
 function constraint_converter_power_balance(pm::_PM.AbstractPowerModel, i::Int, n::Int, reference_network_idx)
     pconv = _PM.var(pm, n, :pconv_ac, i)
     pconv_ref = _PM.var(pm, reference_network_idx, :pconv_ac, i)

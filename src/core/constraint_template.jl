@@ -514,6 +514,10 @@ function constraint_generator_ramping(pm::_PM.AbstractPowerModel, i::Int, nw::In
     return constraint_generator_ramping(pm, i, nw, previous_hour_network, ΔPg_up, ΔPg_down, pmin)
 end
 
+function constraint_unit_commitment_reserves(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    return constraint_unit_commitment_reserves(pm, i, nw)
+end
+
 function constraint_frequency_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
     reference_network_idx = get_reference_network_id(pm, nw)
 
