@@ -264,6 +264,11 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
@@ -280,9 +285,9 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
             end
 
             if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, gcont, ΔT, f0, fmin, fmax, fdb, z_convs, hvdc_contribution, i)
             else
-                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, fdb, z_convs, hvdc_contribution, i)
             end
         end
     end
@@ -321,6 +326,13 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
+
+
         tie_line = _PM.ref(pm, nw, :tie_lines)[bcont]
         br_id = tie_line["br_idx"]
         f_idx = _PM.ref(pm, nw, :branch)[br_id]["f_bus"]
@@ -345,7 +357,7 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
                 z_convs = Dict()
             end
 
-            constraint_frequency_tie_line(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, br_idx, i)
+            constraint_frequency_tie_line(pm, nw, reference_network_idx, g_properties, ΔT, f0, fmin, fmax, fdb, z_convs, hvdc_contribution, br_idx, i)
         end
     end
 end
@@ -384,6 +396,11 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
@@ -400,9 +417,9 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
             end
 
             if _PM.ref(pm, nw, :convdc, ccont)["zone"] == zone
-                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ccont, ΔT, f0, fmin, fmax, fdb, z_convs, hvdc_contribution, i)
             else
-                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ΔT, f0, fmin, fmax, z_convs, hvdc_contribution, i)
+                constraint_frequency_converter(pm, nw, reference_network_idx , g_properties, ΔT, f0, fmin, fmax, fdb, z_convs, hvdc_contribution, i)
             end
         end
     end
@@ -555,8 +572,12 @@ function constraint_frequency_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
-        fdb = frequency_parameters["fdb"]
         Δfss = frequency_parameters["delta_fss"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
@@ -616,6 +637,11 @@ function constraint_frequency_tie_line_droop(pm::_PM.AbstractPowerModel; nw::Int
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
         Δfss = frequency_parameters["delta_fss"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
 
         tie_line = _PM.ref(pm, nw, :tie_lines)[bcont]
         br_id = tie_line["br_idx"]
@@ -641,7 +667,7 @@ function constraint_frequency_tie_line_droop(pm::_PM.AbstractPowerModel; nw::Int
                 z_convs = Dict()
             end
 
-            constraint_frequency_tie_line_droop(pm, nw, reference_network_idx, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, Δfss, z_convs, hvdc_contribution, br_idx, i)
+            constraint_frequency_tie_line_droop(pm, nw, reference_network_idx, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, br_idx, i)
         end
     end
 end
@@ -682,6 +708,11 @@ function constraint_frequency_converter_droop(pm::_PM.AbstractPowerModel; nw::In
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
         Δfss = frequency_parameters["delta_fss"]
+        if haskey(requency_parameters, "fdb")
+            fdb = frequency_parameters["fdb"]
+        else
+            fdb = 0
+        end
 
         zones = [i for i in _PM.ids(pm, nw, :zones)]
         for i in zones
@@ -698,9 +729,9 @@ function constraint_frequency_converter_droop(pm::_PM.AbstractPowerModel; nw::In
             end
 
             if _PM.ref(pm, nw, :convdc, ccont)["zone"] == zone
-                constraint_frequency_converter_droop(pm, nw, reference_network_idx , g_properties, ccont, ΔTin, ΔTdroop, f0, fmin, fmax, Δfss, z_convs, hvdc_contribution, i)
+                constraint_frequency_converter_droop(pm, nw, reference_network_idx , g_properties, ccont, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i)
             else
-                constraint_frequency_converter_droop(pm, nw, reference_network_idx , g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, Δfss, z_convs, hvdc_contribution, i)
+                constraint_frequency_converter_droop(pm, nw, reference_network_idx , g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i)
             end
         end
     end
