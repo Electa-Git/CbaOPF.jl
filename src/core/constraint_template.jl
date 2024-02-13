@@ -264,7 +264,7 @@ function constraint_frequency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_de
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
@@ -326,7 +326,7 @@ function constraint_frequency_tie_line(pm::_PM.AbstractPowerModel; nw::Int = _PM
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
@@ -396,7 +396,7 @@ function constraint_frequency_converter(pm::_PM.AbstractPowerModel; nw::Int = _P
         fmin = frequency_parameters["fmin"]
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
@@ -573,7 +573,7 @@ function constraint_frequency_droop(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
         Δfss = frequency_parameters["delta_fss"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
@@ -637,7 +637,7 @@ function constraint_frequency_tie_line_droop(pm::_PM.AbstractPowerModel; nw::Int
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
         Δfss = frequency_parameters["delta_fss"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
@@ -708,7 +708,7 @@ function constraint_frequency_converter_droop(pm::_PM.AbstractPowerModel; nw::In
         fmax = frequency_parameters["fmax"]
         f0 = frequency_parameters["f0"]
         Δfss = frequency_parameters["delta_fss"]
-        if haskey(requency_parameters, "fdb")
+        if haskey(frequency_parameters, "fdb")
             fdb = frequency_parameters["fdb"]
         else
             fdb = 0
