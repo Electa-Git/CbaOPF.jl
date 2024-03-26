@@ -538,3 +538,132 @@ end
 
 #     report && _PM.sol_component_value(pm, nw, :gen, :rg, _PM.ids(pm, nw, :gen), rg)
 # end
+
+function variable_contingencies(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
+    variable_generator_contingency(pm, nw = nw)
+    variable_generator_contingency_indicator(pm, nw = nw)
+    variable_converter_contingency(pm, nw = nw)
+    variable_converter_contingency_indicator(pm, nw = nw)
+    variable_tieline_contingency(pm, nw = nw)
+    variable_tieline_contingency_indicator(pm, nw = nw)
+end
+
+function variable_generator_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    δPg = _PM.var(pm, nw)[:gen_cont] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_gen_cont",
+    start = 0.0
+    )
+
+    if bounded
+        pg_max = maximum([gen["pmax"] for (g, gen) in _PM.ref(pm, nw, :gen)])
+        for (z, zone) in _PM.ref(pm, nw, :zones)
+            JuMP.set_lower_bound(δPg[z], 0)
+            JuMP.set_upper_bound(δPg[z],  pg_max)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :gen_cont, _PM.ids(pm, nw, :zones), δPg)
+end
+
+function variable_generator_contingency_indicator(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    delta_g = _PM.var(pm, nw)[:delta_g] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :gen)], base_name="$(nw)_delta_g",
+        binary = true,
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
+    )
+    report && _PM.sol_component_value(pm, nw, :gen, :delta_g, _PM.ids(pm, nw, :gen), delta_g)
+end
+
+function variable_converter_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    δPc_plus = _PM.var(pm, nw)[:conv_cont_plus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_conv_cont_plus",
+    start = 0.0
+    )
+
+    δPc_minus = _PM.var(pm, nw)[:conv_cont_minus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_conv_cont_minus",
+    start = 0.0
+    )
+
+    if bounded
+        pc_max = maximum([conv["Pacrated"] for (c, conv) in _PM.ref(pm, nw, :convdc)])
+        for (z, zone) in _PM.ref(pm, nw, :zones)
+            JuMP.set_lower_bound(δPc_plus[z], 0)
+            JuMP.set_lower_bound(δPc_minus[z], -pc_max)
+            JuMP.set_upper_bound(δPc_plus[z],  pc_max)
+            JuMP.set_upper_bound(δPc_minus[z],  0)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :conv_cont_plus, _PM.ids(pm, nw, :zones), δPc_plus)
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :conv_cont_minus, _PM.ids(pm, nw, :zones), δPc_minus)
+end
+
+function variable_converter_contingency_indicator(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    delta_c_plus = _PM.var(pm, nw)[:delta_c_plus] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_delta_c_plus",
+        binary = true,
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
+    )
+
+    delta_c_minus = _PM.var(pm, nw)[:delta_c_minus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :convdc)], base_name="$(nw)_delta_c_minus",
+    binary = true,
+    start = 0,
+    lower_bound = 0,
+    upper_bound = 1
+    )
+
+    report && _PM.sol_component_value(pm, nw, :convdc, :delta_c_plus, _PM.ids(pm, nw, :convdc), delta_c_plus)
+    report && _PM.sol_component_value(pm, nw, :convdc, :delta_c_minus, _PM.ids(pm, nw, :convdc), delta_c_minus)
+end
+
+function variable_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    δPl_plus = _PM.var(pm, nw)[:tieline_cont_plus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :areas)], base_name="$(nw)_tieline_cont_plus",
+    start = 0.0
+    )
+
+    δPl_minus = _PM.var(pm, nw)[:tieline_cont_minus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :areas)], base_name="$(nw)_tieline_cont_minus",
+    start = 0.0
+    )
+
+    if bounded
+        pl_max = maximum([branch["rate_a"] for (b, branch) in _PM.ref(pm, nw, :branch)])
+        for (a, area) in _PM.ref(pm, nw, :areas)
+            JuMP.set_lower_bound(δPl_plus[a], 0)
+            JuMP.set_lower_bound(δPl_minus[a], -pl_max)
+            JuMP.set_upper_bound(δPl_plus[a],  pl_max)
+            JuMP.set_upper_bound(δPl_minus[a],  0)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :tieline_cont_plus, _PM.ids(pm, nw, :areas), δPl_plus)
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :tieline_cont_minus, _PM.ids(pm, nw, :areas), δPl_minus)
+end
+
+function variable_tieline_contingency_indicator(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    delta_l_plus = _PM.var(pm, nw)[:delta_l_plus] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :branch)], base_name="$(nw)_delta_l_plus",
+        binary = true,
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
+    )
+
+    delta_l_minus = _PM.var(pm, nw)[:delta_l_minus] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :branch)], base_name="$(nw)_delta_l_minus",
+    binary = true,
+    start = 0,
+    lower_bound = 0,
+    upper_bound = 1
+    )
+
+    report && _PM.sol_component_value(pm, nw, :branch, :delta_l_plus, _PM.ids(pm, nw, :branch), delta_l_plus)
+    report && _PM.sol_component_value(pm, nw, :branch, :delta_l_minus, _PM.ids(pm, nw, :branch), delta_l_minus)
+end

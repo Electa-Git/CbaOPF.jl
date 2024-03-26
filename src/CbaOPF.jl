@@ -21,6 +21,7 @@ include("prob/zonal_tnep.jl")
 include("prob/nodal_tnep.jl")
 include("prob/fs_opf.jl")
 include("prob/fs_uc.jl")
+include("prob/fs_uc_lean.jl")
 include("prob/uc.jl")
 include("prob/fs_rd_opf.jl")
 

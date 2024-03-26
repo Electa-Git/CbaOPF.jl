@@ -601,7 +601,197 @@ function  constraint_generator_droop_absolute(pm::_PM.AbstractPowerModel, i::Int
     JuMP.@constraint(pm.model, pg_droop_abs >= -pg_droop)
 end
 
+function constraint_generator_contingency(pm::_PM.AbstractPowerModel, i::Int, n::Int, zone)
+    pg = _PM.var(pm, n, :pg, i)
+    δPg = _PM.var(pm, n, :gen_cont, zone)
 
+    JuMP.@constraint(pm.model, δPg >= pg)
+end
+
+function constraint_select_generator_contingency(pm::_PM.AbstractPowerModel, n::Int, zone_gens)
+    δg = _PM.var(pm, n, :delta_g)
+
+    JuMP.@constraint(pm.model, sum(δg[g] for g in zone_gens) == 1) # could probably be relaxed as >= 1, to be tested.
+end
+
+function constraint_generator_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int, n::Int, bigM, zone)
+    pg = _PM.var(pm, n, :pg, i)
+    δg = _PM.var(pm, n, :delta_g, i)
+    δPg = _PM.var(pm, n, :gen_cont, zone)
+
+    JuMP.@constraint(pm.model, (δg- 1) * bigM <= δPg - pg)
+    JuMP.@constraint(pm.model, δPg - pg <= (1-δg) * bigM)
+end
+
+function constraint_converter_contingency(pm::_PM.AbstractPowerModel, i::Int, n::Int, zone)
+    pc = _PM.var(pm, n, :pconv_ac, i)
+    δPc_plus = _PM.var(pm, n, :conv_cont_plus, zone)
+    δPc_minus = _PM.var(pm, n, :conv_cont_minus, zone)
+
+    JuMP.@constraint(pm.model, δPc_plus >= pc)
+    JuMP.@constraint(pm.model, δPc_minus <= pc)
+end
+
+function constraint_select_converter_contingency(pm::_PM.AbstractPowerModel, n::Int, zone_convs)
+    δc_plus = _PM.var(pm, n, :delta_c_plus)
+    δc_minus = _PM.var(pm, n, :delta_c_minus)
+
+    JuMP.@constraint(pm.model, sum(δc_plus[c] for c in zone_convs) == 1) # could probably be relaxed as >= 1, to be tested.
+    JuMP.@constraint(pm.model, sum(δc_minus[c] for c in zone_convs) == 1) # could probably be relaxed as >= 1, to be tested.
+end
+
+function constraint_converter_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int, n::Int, bigM, zone)
+    pc = _PM.var(pm, n, :pconv_ac, i)
+    δc_plus = _PM.var(pm, n, :delta_c_plus, i)
+    δc_minus = _PM.var(pm, n, :delta_c_minus, i)
+    δPc_plus = _PM.var(pm, n, :conv_cont_plus, zone)
+    δPc_minus = _PM.var(pm, n, :conv_cont_minus, zone)
+
+    JuMP.@constraint(pm.model, (δc_plus- 1) * bigM <= δPc_plus - pc)
+    JuMP.@constraint(pm.model, δPc_plus - pc <= (1-δc_plus) * bigM)
+
+    JuMP.@constraint(pm.model, (δc_minus- 1) * bigM <= δPc_minus - pc)
+    JuMP.@constraint(pm.model, δPc_minus - pc <= (1-δc_minus) * bigM)
+end
+
+function constraint_branch_contingency(pm::_PM.AbstractPowerModel, br_idx, n::Int)
+    pl = _PM.var(pm, n, :p)[br_idx]
+    δPl = _PM.var(pm, n, :branch_cont)
+
+    JuMP.@constraint(pm.model, δPl >=  pl)
+    JuMP.@constraint(pm.model, δPl >= -pl)
+end
+
+function constraint_select_branch_contingency(pm::_PM.AbstractPowerModel, n::Int)
+    δl = _PM.var(pm, n, :delta_l)
+
+    JuMP.@constraint(pm.model, sum(δl) == 1)
+end
+
+function constraint_branch_contingency_indicator(pm::_PM.AbstractPowerModel, i, n::Int, br_idx, bigM)
+    pl = _PM.var(pm, n, :p)[br_idx]
+    δl = _PM.var(pm, n, :delta_l, i)
+    δPl = _PM.var(pm, n, :branch_cont)
+
+    JuMP.@constraint(pm.model, (δl- 1) * bigM <= δPl - pl)
+    JuMP.@constraint(pm.model, δPl - pl <= (1-δl) * bigM)
+end
+
+function constraint_frequency_droop_lean(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, zone_convs, hvdc_contribution, zone; zone_cont = false)
+    ΔPg = _PM.var(pm, ref_id, :gen_cont, zone)
+    αg = _PM.var(pm, ref_id, :alpha_g)
+    δg = _PM.var(pm, ref_id, :delta_g)
+    pconv_in = _PM.var(pm, n, :pconv_in)
+    pg_droop = _PM.var(pm, n, :pg_droop)
+    htot = _PM.var(pm, n, :htot, zone)
+    dc_contr = _PM.var(pm, n, :dc_contr, zone)
+
+    if isempty(zone_convs) || hvdc_contribution == false
+        dc_contribution_in = 0
+        dc_contribution_droop = 0
+    else
+        dc_contribution_in = calculate_hvdc_contribution(pconv_in, ΔTin, zone_convs)
+        dc_contribution_droop = calculate_hvdc_contribution_droop(pconv_in, ΔTin, ΔTdroop, zone_convs)
+    end
+
+    gen_contribution_droop = calculate_gen_contribution_droop(pg_droop, ΔTin, ΔTdroop, generator_properties)
+
+    if zone_cont == true
+        ΔPg_ =  JuMP.@expression(pm.model, ΔPg)
+    else
+        ΔPg_ =  JuMP.@expression(pm.model, 0)
+    end
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * (αg[g] - δg[g]) for (g, properties) in generator_properties]) *  (2 * (fmin - (f0-fdb))) <= 
+     - f0 * (ΔPg_ *  ΔTin - dc_contribution_in)
+    )
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * (αg[g] - δg[g]) for (g, properties) in generator_properties]) *  (2 * (fmax - (f0+fdb))) >= 
+     - f0 * (ΔPg_ *  ΔTin - dc_contribution_in)
+    )
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] *  (αg[g] - δg[g]) for (g, properties) in generator_properties]) *  (2 * (fmin - (f0-fdb))) <= 
+     - f0 * (ΔPg_ * ΔTdroop - dc_contribution_in - dc_contribution_droop - gen_contribution_droop)
+    )
+
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * (αg[g] - δg[g]) for (g, properties) in generator_properties]) *  (2 * (fmax - (f0+fdb))) >= 
+     - f0 * (ΔPg_ * ΔTdroop - dc_contribution_in - dc_contribution_droop - gen_contribution_droop)
+    )
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * (αg[g] - δg[g]) for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution_in + dc_contribution_droop)
+end
+
+function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, zone_convs, hvdc_contribution, zone; zone_cont = false, direction = "plus")
+    ΔPc_plus = _PM.var(pm, ref_id, :conv_cont_plus, zone)
+    ΔPc_minus = _PM.var(pm, ref_id, :conv_cont_minus, zone)
+    αg = _PM.var(pm, ref_id, :alpha_g)
+    pconv_in = _PM.var(pm, n, :pconv_in)
+    pg_droop = _PM.var(pm, n, :pg_droop)
+    htot = _PM.var(pm, n, :htot, zone)
+    dc_contr = _PM.var(pm, n, :dc_contr, zone)
+
+    if isempty(zone_convs) || hvdc_contribution == false
+        dc_contribution_in = 0
+        dc_contribution_droop = 0
+    else
+        dc_contribution_in = calculate_hvdc_contribution(pconv_in, ΔTin, zone_convs)
+        dc_contribution_droop = calculate_hvdc_contribution_droop(pconv_in, ΔTin, ΔTdroop, zone_convs)
+        constraint_contingent_converter(pm, n, ref_id, zone_convs, direction)
+    end
+
+    gen_contribution_droop = calculate_gen_contribution_droop(pg_droop, ΔTin, ΔTdroop, generator_properties)
+
+    if zone_cont == true && direction == "plus"
+        ΔPc_ =  JuMP.@expression(pm.model, ΔPc_plus)
+    elseif zone_cont == true && direction == "minus"
+        ΔPc_ =  JuMP.@expression(pm.model, ΔPc_minus)
+    else
+        ΔPc_ =  JuMP.@expression(pm.model, 0)
+    end
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * αg[g] for (g, properties) in generator_properties]) *  (2 * (fmin - (f0-fdb))) <= 
+     - f0 * (ΔPc_ *  ΔTin - dc_contribution_in)
+    )
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * αg[g] for (g, properties) in generator_properties]) *  (2 * (fmax - (f0+fdb))) >= 
+     - f0 * (ΔPc_ *  ΔTin - dc_contribution_in)
+    )
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] *  αg[g] for (g, properties) in generator_properties]) *  (2 * (fmin - (f0-fdb))) <= 
+     - f0 * (ΔPc_ * ΔTdroop - dc_contribution_in - dc_contribution_droop - gen_contribution_droop)
+    )
+
+
+    JuMP.@constraint(pm.model, 
+    sum([properties["inertia"] * properties["rating"] * αg[g] for (g, properties) in generator_properties]) *  (2 * (fmax - (f0+fdb))) >= 
+     - f0 * (ΔPc_ * ΔTdroop - dc_contribution_in - dc_contribution_droop - gen_contribution_droop)
+    )
+
+    JuMP.@constraint(pm.model, htot == sum([properties["inertia"] * properties["rating"] * αg[g] for (g, properties) in generator_properties]))
+    JuMP.@constraint(pm.model, dc_contr == dc_contribution_in + dc_contribution_droop)
+end
+
+function constraint_contingent_converter(pm::_PM.AbstractPowerModel, n::Int, ref_id::Int, zone_convs, direction)
+    if direction == "plus"
+        δc = _PM.var(pm, ref_id, :delta_c_plus)
+    else
+        δc = _PM.var(pm, ref_id, :delta_c_minus)
+    end
+    pconv_in = _PM.var(pm, n, :pconv_in)
+    for (c, conv) in zone_convs
+        JuMP.@constraint(pm.model, -2 * _PM.ref(pm, ref_id, :convdc, c)["Pacrated"] <= pconv_in[c] * δc[c]) 
+        JuMP.@constraint(pm.model,  2 * _PM.ref(pm, ref_id, :convdc, c)["Pacrated"] >= pconv_in[c] * δc[c])
+    end
+end
 
 
 # function constraint_frequency_inertia(pm::_PM.AbstractPowerModel, n::Int, ref_id, generator_properties, gcont, f0, fmin, fmax, Tfcr, zone_convs, hvdc_contribution, zone)

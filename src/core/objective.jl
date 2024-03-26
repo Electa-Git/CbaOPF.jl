@@ -280,7 +280,7 @@ function objective_min_cost_frequency_uc(pm::_PM.AbstractPowerModel; report::Boo
         + sum( sum( load_cost_curt[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
         + sum( sum( load_cost_red[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
         + sum( sum( ffr_cost[(n,i)] for (i,conv) in _PM.nws(pm)[n][:convdc]) for n in pm.ref[:it][:pm][:cont_ids])
-        + sum( sum( fcr_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm))
+        + sum( sum( fcr_cost[(n,i)] for (i,gen) in _PM.nws(pm)[n][:gen]) for n in pm.ref[:it][:pm][:cont_ids])
     )
 end
 
@@ -303,5 +303,47 @@ function objective_min_cost_uc(pm::_PM.AbstractPowerModel; report::Bool=true, dr
         sum( sum( gen_cost[(n,i)] for (i,gen) in _PM.nws(pm)[n][:gen]) for n in pm.ref[:it][:pm][:hour_ids]) 
         + sum( sum( load_cost_curt[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
         + sum( sum( load_cost_red[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
+    )
+end
+
+function objective_min_cost_frequency_uc_lean(pm::_PM.AbstractPowerModel; report::Bool=true, droop = false)
+    gen_cost = Dict()
+    ffr_cost = Dict()
+    fcr_cost = Dict()
+
+    for (n, network) in pm.ref[:it][:pm][:nw]
+        for (i,gen) in _PM.nws(pm)[n][:gen]
+            beta_g =  _PM.var(pm, n, :beta_g, i)
+            alpha_g =  _PM.var(pm, n, :alpha_g, i)
+            pg =  _PM.var(pm, n, :pg, i)
+            gen_cost[(n,i)] = (beta_g * gen["start_up_cost"] * gen["pmax"]) + (gen["cost"][1]*pg + (gen["cost"][2] * alpha_g))  #+  (1 - alpha_g) * gen["rdcost_down"][1] * dpg_down
+        
+            if n == 1 || droop == false
+                fcr_cost[(n,i)] = 0.0
+            else
+                pgd =  _PM.var(pm, n, :pg_droop_abs, i)
+                fcr_cost[(n,i)] = (pgd * gen["fcr_cost"])
+            end
+        end
+
+        for (c, conv) in _PM.nws(pm)[n][:convdc]
+            if n == 1
+                ffr_cost[(n,c)] = 0.0
+            else
+                pconv =  _PM.var(pm, n, :pconv_in_abs, c)
+                ffr_cost[(n,c)] = (pconv * conv["ffr_cost"]) * 1/2  # as it is summed-up
+            end
+        end
+
+    end
+
+    load_cost_red, load_cost_curt = calc_load_operational_cost_uc(pm)
+
+    return JuMP.@objective(pm.model, Min,
+        sum( sum( gen_cost[(n,i)] for (i,gen) in _PM.nws(pm)[n][:gen]) for n in pm.ref[:it][:pm][:hour_ids]) 
+        + sum( sum( load_cost_curt[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
+        + sum( sum( load_cost_red[(n,i)] for (i,load) in _PM.nws(pm)[n][:load]) for n in pm.ref[:it][:pm][:hour_ids])
+        + sum( sum( ffr_cost[(n,i)] for (i,conv) in _PM.nws(pm)[n][:convdc]) for n in pm.ref[:it][:pm][:hour_ids])
+        + sum( sum( fcr_cost[(n,i)] for (i,gen) in nw_ref[:gen]) for (n, nw_ref) in _PM.nws(pm))
     )
 end

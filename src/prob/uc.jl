@@ -71,6 +71,17 @@ function build_uc(pm::_PM.AbstractPowerModel)
             constraint_ohms_y_to_pst(pm, i; nw = n)
             constraint_limits_pst(pm, i; nw = n)
         end
+
+        if haskey(pm.setting, "fix_cross_border_flows") && pm.setting["fix_cross_border_flows"] == true
+            if !haskey(pm.setting, "borders")
+                borders = [i for i in _PM.ids(pm, n,:borders)]
+            else
+                borders = [i for i in pm.setting["borders"]]
+            end
+            for i in borders
+                constraint_fixed_xb_flows(pm, i; nw = n)
+            end
+        end
     end
 
     objective_min_cost_uc(pm)

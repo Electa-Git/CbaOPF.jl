@@ -759,78 +759,329 @@ function constraint_generator_droop_absolute(pm::_PM.AbstractPowerModel, i::Int;
 end
 
 
+function constraint_generator_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
 
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == gen["zone"]
+                constraint_generator_contingency(pm, g, reference_network_idx, zone)
+            end
+        end
+    end 
+end
 
+function constraint_generator_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
 
+    bigM = 2 * maximum([gen["pmax"] for (g, gen) in _PM.ref(pm, nw, :gen)])
+    gen = _PM.ref(pm, nw, :gen, i)
+    gen_zone = gen["zone"]
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for z in zones
+        zone = _PM.ref(pm, nw, :zones, z)["zone"]
+        if gen_zone == zone
+            constraint_generator_contingency_indicator(pm, i, reference_network_idx, bigM, z)
+        end
+    end
+end
 
+function constraint_select_generator_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        zone_gens = []
+        for (g, gen) in _PM.ref(pm, nw, :gen)
+            if haskey(gen, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == gen["zone"]
+                append!(zone_gens, g)
+            end
+        end
+        constraint_select_generator_contingency(pm, reference_network_idx, zone_gens)
+    end 
+end
 
+function constraint_converter_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
+                constraint_converter_contingency(pm, c, reference_network_idx, zone)
+            end
+        end
+    end
+end
 
+function constraint_converter_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    bigM = 2 * maximum([conv["Pacrated"] for (c, conv) in _PM.ref(pm, nw, :convdc)])
 
+    conv = _PM.ref(pm, nw, :convdc, i)
+    conv_zone = conv["zone"]
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for z in zones
+        zone = _PM.ref(pm, nw, :zones, z)["zone"]
+        if conv_zone == zone
+            constraint_converter_contingency_indicator(pm, i, reference_network_idx, bigM, z)
+        end
+    end
+end
 
+function constraint_select_converter_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        zone_convs = []
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
+                append!(zone_convs, c)
+            end
+        end
+        constraint_select_converter_contingency(pm, reference_network_idx, zone_convs)
+    end 
+end
 
-# function constraint_frequency_inertia(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
-#     reference_network_idx = get_reference_network_id(pm, nw)
+function constraint_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
 
-#     if !isnothing(_PM.ref(pm, nw, :contingency)["gen_id"])
-#         gcont = _PM.ref(pm, nw, :contingency)["gen_id"]
-#         generator_properties = Dict()
-#         zone_convs = Dict()
-#         for (g, gen) in _PM.ref(pm, nw, :gen)
-#             if haskey(gen, "zone")
-#                 zone = gen["zone"]
-#                 if !haskey(generator_properties, zone)
-#                     generator_properties[zone] = Dict()
-#                 end
-#                 if g != gcont
-#                     push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
-#                 else
-#                     push!(generator_properties[zone], g => Dict("inertia" => 0, "rating" => gen["pmax"]))
-#                 end
-#             end
-#         end
+    areas = [i for i in _PM.ids(pm, nw, :areas)]
+    for area in areas
+        for (b, branch) in _PM.ref(pm, nw, :branchdc)
+            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
+                constraint_converter_contingency(pm, c, reference_network_idx, zone)
+            end
+        end
+    end
+end
 
-#         for (c, conv) in _PM.ref(pm, nw, :convdc)
-#             if haskey(conv, "zone")
-#                 zone = conv["zone"] 
-#                 if !haskey(zone_convs, zone)
-#                     zone_convs[zone] = Dict()
-#                 end
-#                 push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"], "pmax" => conv["Pacmax"], "pmax" => conv["Pacmin"]))
-#             end
-#         end
+function constraint_tieline_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    bigM = 2 * maximum([conv["Pacrated"] for (c, conv) in _PM.ref(pm, nw, :convdc)])
 
-#         frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
-#         Tfcr = frequency_parameters["t_fcr"]
-#         Tfcrd = frequency_parameters["t_fcr"]
-#         fmin = frequency_parameters["fmin"]
-#         fmax = frequency_parameters["fmax"]
-#         f0 = frequency_parameters["f0"]
+    conv = _PM.ref(pm, nw, :convdc, i)
+    conv_zone = conv["zone"]
+    zones = [z for z in _PM.ids(pm, nw, :zones)]
+    for z in zones
+        zone = _PM.ref(pm, nw, :zones, z)["zone"]
+        if conv_zone == zone
+            constraint_converter_contingency_indicator(pm, i, reference_network_idx, bigM, z)
+        end
+    end
+end
 
-#         zones = [i for i in _PM.ids(pm, nw, :zones)]
-#         for i in zones
-#             zone = _PM.ref(pm, nw, :zones, i)["zone"]
-#             if haskey(generator_properties, zone)
-#                 g_properties = generator_properties[zone]
-#             else
-#                 g_properties = Dict()
-#             end
-#             if haskey(zone_convs, zone)
-#                 z_convs = zone_convs[zone]
-#             else
-#                 z_convs = Dict()
-#             end
+function constraint_select_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    zones = [z for z in _PM.ids(pm, nw, :zones)]
+    for zone in zones
+        zone_convs = []
+        for (c, conv) in _PM.ref(pm, nw, :convdc)
+            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
+                append!(zone_convs, c)
+            end
+        end
+        constraint_select_converter_contingency(pm, reference_network_idx, zone_convs)
+    end 
+end
 
-#             if _PM.ref(pm, nw, :gen, gcont)["zone"] == zone
-#                 constraint_frequency_inertia(pm, nw, reference_network_idx, g_properties, gcont, Tfcr, f0, fmin, fmax, z_convs, hvdc_contribution, i)
-#             else
-#                 constraint_frequency_inertia(pm, nw, reference_network_idx, g_properties, Tfcr, f0, fmin, fmax, z_convs, hvdc_contribution, i)
-#             end
-#         end
-#     end
+# function constraint_branch_contingency(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+#     branch_id = _PM.ref(pm, nw, :tie_lines, i)["br_idx"]
+#     branch = _PM.ref(pm, nw, :branch, branch_id)
+#     f_idx = branch["f_bus"]
+#     t_idx = branch["t_bus"]
+#     br_idx = (branch_id, f_idx, t_idx)
+
+#     constraint_branch_contingency(pm, br_idx, nw)
 # end
 
-# function constraint_converter_power_balance_ramp(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
-#     reference_network_idx = get_reference_network_id(pm, nw)
+# function constraint_branch_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+#     branch_id = _PM.ref(pm, nw, :tie_lines, i)["br_idx"]
+#     branch = _PM.ref(pm, nw, :branch, branch_id)
+#     f_idx = branch["f_bus"]
+#     t_idx = branch["t_bus"]
+#     br_idx = (branch_id, f_idx, t_idx)
 
-#     constraint_converter_power_balance_ramp(pm, i, nw, reference_network_idx)
+#     bigM = 2 * maximum([branch["rate_a"] for (br, branch) in _PM.ref(pm, nw, :branch)])
+#     constraint_branch_contingency_indicator(pm, i, nw, br_idx, bigM)
 # end
+
+function constraint_frequency_droop_lean(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    ref_id = get_reference_network_id(pm, nw)
+    generator_properties = Dict()
+    zone_convs = Dict()
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if haskey(gen, "zone")
+            zone = gen["zone"]
+            if !haskey(generator_properties, zone)
+                generator_properties[zone] = Dict()
+            end
+        push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "zone")
+            zone = conv["zone"] 
+            if !haskey(zone_convs, zone)
+                zone_convs[zone] = Dict()
+            end
+            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+        end
+    end
+
+    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+    ΔTin = frequency_parameters["t_fcr"]
+    ΔTdroop = frequency_parameters["t_fcrd"]
+    fmin = frequency_parameters["fmin"]
+    fmax = frequency_parameters["fmax"]
+    f0 = frequency_parameters["f0"]
+    Δfss = frequency_parameters["delta_fss"]
+    if haskey(frequency_parameters, "fdb")
+        fdb = frequency_parameters["fdb"]
+    else
+        fdb = 0
+    end
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for i in zones
+        zone = _PM.ref(pm, nw, :zones, i)["zone"]
+        if haskey(generator_properties, zone)
+            g_properties = generator_properties[zone]
+        else
+            g_properties = Dict()
+        end
+        if haskey(zone_convs, zone)
+            z_convs = zone_convs[zone]
+        else
+            z_convs = Dict()
+        end
+        constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true)
+        for j in setdiff(zones, i)
+            zone_ = _PM.ref(pm, nw, :zones, j)["zone"]
+            if haskey(generator_properties, zone_)
+                g_properties = generator_properties[zone_]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, zone_)
+                z_convs = zone_convs[zone_]
+            else
+                z_convs = Dict()
+            end
+            constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false)
+        end
+    end
+end
+
+function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    ref_id = get_reference_network_id(pm, nw)
+    generator_properties = Dict()
+    zone_convs = Dict()
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if haskey(gen, "zone")
+            zone = gen["zone"]
+            if !haskey(generator_properties, zone)
+                generator_properties[zone] = Dict()
+            end
+        push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "zone")
+            zone = conv["zone"] 
+            if !haskey(zone_convs, zone)
+                zone_convs[zone] = Dict()
+            end
+            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+        end
+    end
+
+    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+    ΔTin = frequency_parameters["t_fcr"]
+    ΔTdroop = frequency_parameters["t_fcrd"]
+    fmin = frequency_parameters["fmin"]
+    fmax = frequency_parameters["fmax"]
+    f0 = frequency_parameters["f0"]
+    Δfss = frequency_parameters["delta_fss"]
+    if haskey(frequency_parameters, "fdb")
+        fdb = frequency_parameters["fdb"]
+    else
+        fdb = 0
+    end
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for i in zones
+        zone = _PM.ref(pm, nw, :zones, i)["zone"]
+        if haskey(generator_properties, zone)
+            g_properties = generator_properties[zone]
+        else
+            g_properties = Dict()
+        end
+        if haskey(zone_convs, zone)
+            z_convs = zone_convs[zone]
+        else
+            z_convs = Dict()
+        end
+        
+        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true, direction = "plus")
+        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true, direction = "minus")
+        for j in setdiff(zones, i)
+            zone_ = _PM.ref(pm, nw, :zones, j)["zone"]
+            if haskey(generator_properties, zone_)
+                g_properties = generator_properties[zone_]
+            else
+                g_properties = Dict()
+            end
+            if haskey(zone_convs, zone_)
+                z_convs = zone_convs[zone_]
+            else
+                z_convs = Dict()
+            end
+            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "plus")
+            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "minus")
+        end
+    end
+end
