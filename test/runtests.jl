@@ -12,7 +12,6 @@ import HiGHS  # needs startvalues for all variables!
 Memento.setlevel!(Memento.getlogger(_PMACDC), "error")
 Memento.setlevel!(Memento.getlogger(_PM), "error")
 
-
 using Test
 
 include("prepare_test_data.jl")

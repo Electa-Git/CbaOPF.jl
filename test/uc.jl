@@ -52,7 +52,6 @@ highs = JuMP.optimizer_with_attributes(HiGHS.Optimizer)
     end
 end
 
-# 
 @testset "2 Grids ACDC" begin
     file = "../test/data/case5_2grids_inertia_acdc.m"
     # Parse file using PowerModels
