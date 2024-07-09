@@ -12,9 +12,9 @@ resultOPF = CbaOPF.solve_cbaopf(data, _PM.DCPPowerModel, highs; setting = s)
 @testset  "Nodal CBA OPF" begin
 
     @test isapprox(resultOPF["objective"], 34021.7, atol = 1e-1)
-    @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 0.955, atol = 1e-2)
-    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.202, atol = 1e-2)
-    @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], 0.977907, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["gen"]["3"]["pg"], 2.9, atol = 1e-1)
+    @test isapprox(resultOPF["solution"]["branch"]["2"]["pt"], -1.37, atol = 1e-2)
+    @test isapprox(resultOPF["solution"]["convdc"]["4"]["ptf_to"], -0.99, atol = 1e-2)
 end
 
 # Let us deactivate a line (branch 5) and run the redispatch minimisation problem
@@ -33,7 +33,7 @@ resultRD_no_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setti
 s = Dict("output" => Dict("branch_flows" => true, "duals" =>true), "conv_losses_mp" => false, "fix_cross_border_flows" => true, "fix_converter_setpoints" => false, "inertia_limit" => false)
 resultRD_with_control = CbaOPF.solve_rdopf(dataRD, _PM.DCPPowerModel, highs; setting = s) 
 
-@test isapprox(resultRD_no_control["objective"] - resultRD_with_control["objective"] , 5485.38, atol = 1e-1)
+@test isapprox(resultRD_no_control["objective"] - resultRD_with_control["objective"] , 1822.9, atol = 1e-1)
 
 end
 

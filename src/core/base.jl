@@ -18,7 +18,7 @@ function ref_add_pst!(ref::Dict{Symbol,<:Any}, data::Dict{String,<:Any})
         nw_ref[:bus_arcs_pst] = bus_arcs_pst
 
         if !haskey(nw_ref, :buspairs_pst)
-            nw_ref[:buspairs_pst] = _PM.calc_buspair_parameters(nw_ref[:bus], nw_ref[:pst], nw_ref[:conductor_ids], haskey(nw_ref, :conductors))
+            nw_ref[:buspairs_pst] = _PM.calc_buspair_parameters(nw_ref[:bus], nw_ref[:pst])
         end
     end
 end

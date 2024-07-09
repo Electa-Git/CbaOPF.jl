@@ -344,6 +344,16 @@ function variable_storage_energy_content(pm::_PM.AbstractPowerModel; nw::Int=_PM
     report && _PM.sol_component_value(pm, nw, :storage_simple, :es, _PM.ids(pm, nw, :storage_simple), es)
 end
 
+"Variable storage on/off state"
+function variable_storage_on_off(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    alpha_s = _PM.var(pm, nw)[:alpha_s] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :storage)], base_name="$(nw)_alpha_s",
+    binary = true
+    )
+
+    report && _PM.sol_component_value(pm, nw, :storage, :alpha_s, _PM.ids(pm, nw, :storage), alpha_s)
+end
+
 function variable_hvdc_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
     variable_converter_inertia(pm, nw = nw)
     variable_converter_inertia_abs(pm, nw = nw)
@@ -446,6 +456,50 @@ function variable_gen_droop_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_de
     report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :gen, :pg_droop_abs, _PM.ids(pm, nw, :gen), Δpg_abs)
 end
 
+function variable_storage_contribution(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
+    variable_storage_droop(pm, nw = nw)
+    variable_storage_droop_abs(pm, nw = nw)
+end
+
+function variable_storage_droop(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    ps_droop = _PM.var(pm, nw)[:ps_droop] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :storage)], base_name="$(nw)_ps_droop",
+    start = 0
+    )
+
+    if bounded
+        for (s, storage) in _PM.ref(pm, nw, :storage)
+            if storage["fcr_contribution"] == true
+                JuMP.set_lower_bound(ps_droop[s],  - 2 * storage["discharge_rating"])
+                JuMP.set_upper_bound(ps_droop[s],    2 * storage["discharge_rating"])
+            else
+                JuMP.set_lower_bound(ps_droop[s],  0)
+                JuMP.set_upper_bound(ps_droop[s],  0)
+            end
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :storage, :ps_droop, _PM.ids(pm, nw, :storage), ps_droop)
+end
+
+function variable_storage_droop_abs(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    Δps_abs = _PM.var(pm, nw)[:ps_droop_abs] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :storage)], base_name="$(nw)_ps_droop_abs",
+    start = 0
+    )
+
+    if bounded
+        for (s, storage) in _PM.ref(pm, nw, :storage)
+            JuMP.set_lower_bound(Δps_abs[s],  0)
+            JuMP.set_upper_bound(Δps_abs[s],  2 * storage["discharge_rating"])
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :storage, :ps_droop_abs, _PM.ids(pm, nw, :storage), Δps_abs)
+end
+
+
+
 function variable_inertia(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default)
     variable_inertia_gen(pm, nw = nw)
     variable_inertia_tie_line(pm, nw = nw)
@@ -546,6 +600,8 @@ function variable_contingencies(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_de
     variable_converter_contingency_indicator(pm, nw = nw)
     variable_tieline_contingency(pm, nw = nw)
     variable_tieline_contingency_indicator(pm, nw = nw)
+    variable_storage_contingency(pm, nw = nw)
+    variable_storage_contingency_indicator(pm, nw = nw)
 end
 
 function variable_generator_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
@@ -590,7 +646,7 @@ function variable_converter_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.
     if bounded
         pc_max = maximum([conv["Pacrated"] for (c, conv) in _PM.ref(pm, nw, :convdc)])
         for (z, zone) in _PM.ref(pm, nw, :zones)
-            JuMP.set_lower_bound(δPc_plus[z], 0)
+            JuMP.set_lower_bound(δPc_plus[z], -pc_max)
             JuMP.set_lower_bound(δPc_minus[z], -pc_max)
             JuMP.set_upper_bound(δPc_plus[z],  pc_max)
             JuMP.set_upper_bound(δPc_minus[z],  0)
@@ -622,6 +678,38 @@ function variable_converter_contingency_indicator(pm::_PM.AbstractPowerModel; nw
     report && _PM.sol_component_value(pm, nw, :convdc, :delta_c_minus, _PM.ids(pm, nw, :convdc), delta_c_minus)
 end
 
+function variable_storage_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
+    δPs = _PM.var(pm, nw)[:storage_cont] = JuMP.@variable(pm.model,
+    [i in _PM.ids(pm, nw, :zones)], base_name="$(nw)_storage_cont",
+    start = 0.0
+    )
+
+    if bounded
+        if !isempty([storage["thermal_rating"] for (s, storage) in _PM.ref(pm, nw, :storage)])
+            ps_max = maximum([storage["thermal_rating"] for (s, storage) in _PM.ref(pm, nw, :storage)])
+        else
+            ps_max = 0
+        end
+        for (z, zone) in _PM.ref(pm, nw, :zones)
+            JuMP.set_lower_bound(δPs[z], 0)
+            JuMP.set_upper_bound(δPs[z],  ps_max)
+        end
+    end
+
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :storage_cont, _PM.ids(pm, nw, :zones), δPs)
+end
+
+function variable_storage_contingency_indicator(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
+    delta_s = _PM.var(pm, nw)[:delta_s] = JuMP.@variable(pm.model,
+        [i in _PM.ids(pm, nw, :storage)], base_name="$(nw)_delta_s",
+        binary = true,
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
+    )
+    report && _PM.sol_component_value(pm, nw, :storage, :delta_s, _PM.ids(pm, nw, :storage), delta_s)
+end
+
 function variable_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool = true, report::Bool=true)
     δPl_plus = _PM.var(pm, nw)[:tieline_cont_plus] = JuMP.@variable(pm.model,
     [i in _PM.ids(pm, nw, :areas)], base_name="$(nw)_tieline_cont_plus",
@@ -643,13 +731,13 @@ function variable_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw
         end
     end
 
-    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :tieline_cont_plus, _PM.ids(pm, nw, :areas), δPl_plus)
-    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency, :tieline_cont_minus, _PM.ids(pm, nw, :areas), δPl_minus)
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency_l, :tieline_cont_plus, _PM.ids(pm, nw, :areas), δPl_plus)
+    report && _IM.sol_component_value(pm, _PM.pm_it_sym, nw, :contingency_l, :tieline_cont_minus, _PM.ids(pm, nw, :areas), δPl_minus)
 end
 
 function variable_tieline_contingency_indicator(pm::_PM.AbstractPowerModel; nw::Int=_PM.nw_id_default, bounded::Bool=true, report::Bool=true)
     delta_l_plus = _PM.var(pm, nw)[:delta_l_plus] = JuMP.@variable(pm.model,
-        [i in _PM.ids(pm, nw, :branch)], base_name="$(nw)_delta_l_plus",
+        [i in _PM.ids(pm, nw, :tie_lines)], base_name="$(nw)_delta_l_plus",
         binary = true,
         start = 0,
         lower_bound = 0,
@@ -657,13 +745,13 @@ function variable_tieline_contingency_indicator(pm::_PM.AbstractPowerModel; nw::
     )
 
     delta_l_minus = _PM.var(pm, nw)[:delta_l_minus] = JuMP.@variable(pm.model,
-    [i in _PM.ids(pm, nw, :branch)], base_name="$(nw)_delta_l_minus",
-    binary = true,
-    start = 0,
-    lower_bound = 0,
-    upper_bound = 1
+        [i in _PM.ids(pm, nw, :tie_lines)], base_name="$(nw)_delta_l_minus",
+        binary = true,
+        start = 0,
+        lower_bound = 0,
+        upper_bound = 1
     )
 
-    report && _PM.sol_component_value(pm, nw, :branch, :delta_l_plus, _PM.ids(pm, nw, :branch), delta_l_plus)
-    report && _PM.sol_component_value(pm, nw, :branch, :delta_l_minus, _PM.ids(pm, nw, :branch), delta_l_minus)
+    report && _PM.sol_component_value(pm, nw, :tie_lines, :delta_l_plus, _PM.ids(pm, nw, :tie_lines), delta_l_plus)
+    report && _PM.sol_component_value(pm, nw, :tie_lines, :delta_l_minus, _PM.ids(pm, nw, :tie_lines), delta_l_minus)
 end

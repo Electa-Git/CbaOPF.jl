@@ -18,6 +18,7 @@ function build_nodal_tnep(pm::_PM.AbstractPowerModel)
         variable_branch_capacity(pm; nw = n)
         variable_flexible_demand(pm; nw = n)
         variable_pst(pm; nw = n)
+        _PM.variable_storage_power(pm; nw = n)
     end
 
     for (n, networks) in pm.ref[:it][:pm][:nw]

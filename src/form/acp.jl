@@ -9,8 +9,8 @@ function constraint_ohms_y_from_pst(pm::_PM.AbstractACPModel, n::Int, i::Int, f_
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
 
-    JuMP.@NLconstraint(pm.model, p_fr ==  (g+g_fr)*(vm_fr)^2 - g*vm_fr*vm_to*cos(va_fr-va_to-alpha) + -b*vm_fr*vm_to*sin(va_fr-va_to-alpha) )
-    JuMP.@NLconstraint(pm.model, q_fr == -(b+b_fr)*(vm_fr)^2 + b*vm_fr*vm_to*cos(va_fr-va_to-alpha) + -g*vm_fr*vm_to*sin(va_fr-va_to-alpha) )
+    JuMP.@constraint(pm.model, p_fr ==  (g+g_fr)*(vm_fr)^2 - g*vm_fr*vm_to*cos(va_fr-va_to-alpha) + -b*vm_fr*vm_to*sin(va_fr-va_to-alpha) )
+    JuMP.@constraint(pm.model, q_fr == -(b+b_fr)*(vm_fr)^2 + b*vm_fr*vm_to*cos(va_fr-va_to-alpha) + -g*vm_fr*vm_to*sin(va_fr-va_to-alpha) )
 end
 
 function constraint_ohms_y_to_pst(pm::_PM.AbstractACPModel, n::Int, i::Int, f_bus, t_bus, f_idx, t_idx, g, b, g_to, b_to)
@@ -22,8 +22,8 @@ function constraint_ohms_y_to_pst(pm::_PM.AbstractACPModel, n::Int, i::Int, f_bu
     va_fr = _PM.var(pm, n, :va, f_bus)
     va_to = _PM.var(pm, n, :va, t_bus)
 
-    JuMP.@NLconstraint(pm.model, p_to ==  (g+g_to)*vm_to^2 - g*vm_to*vm_fr*cos(va_to-va_fr+alpha) + -b*vm_to*vm_fr*sin(va_to-va_fr+alpha) )
-    JuMP.@NLconstraint(pm.model, q_to == -(b+b_to)*vm_to^2 + b*vm_to*vm_fr*cos(va_to-va_fr+alpha) + -g*vm_to*vm_fr*sin(va_to-va_fr+alpha) )
+    JuMP.@constraint(pm.model, p_to ==  (g+g_to)*vm_to^2 - g*vm_to*vm_fr*cos(va_to-va_fr+alpha) + -b*vm_to*vm_fr*sin(va_to-va_fr+alpha) )
+    JuMP.@constraint(pm.model, q_to == -(b+b_to)*vm_to^2 + b*vm_to*vm_fr*cos(va_to-va_fr+alpha) + -g*vm_to*vm_fr*sin(va_to-va_fr+alpha) )
     end
 
 function constraint_limits_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.nw_id_default)
@@ -43,8 +43,8 @@ function constraint_limits_pst(pm::_PM.AbstractPowerModel, i::Int; nw::Int=_PM.n
     p_to  = _PM.var(pm, nw,  :ppst, t_idx)
     q_to  = _PM.var(pm, nw,  :qpst, t_idx)
 
-    JuMP.@NLconstraint(pm.model, p_fr^2 + q_fr^2 <= srated^2)
-    JuMP.@NLconstraint(pm.model, p_to^2 + q_to^2 <= srated^2)
+    JuMP.@constraint(pm.model, p_fr^2 + q_fr^2 <= srated^2)
+    JuMP.@constraint(pm.model, p_to^2 + q_to^2 <= srated^2)
     JuMP.@constraint(pm.model, alpha <= angmax)
     JuMP.@constraint(pm.model, alpha >= angmin)
 end
@@ -61,6 +61,8 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
     qconv_grid_ac = _PM.var(pm, n,  :qconv_tf_fr)
     pflex = _PM.var(pm, n, :pflex)
     qflex = _PM.var(pm, n, :qflex)
+    ps    = _PM.var(pm, n, :ps)
+    qs    = _PM.var(pm, n, :qs)
 
 
     cstr_p = JuMP.@constraint(pm.model,
@@ -69,6 +71,7 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
         + sum(pconv_grid_ac[c] for c in bus_convs_ac)
         ==
         sum(pg[g] for g in bus_gens)
+        - sum(ps[s] for s in bus_storage)
         - sum(pflex[d] for d in bus_loads)
         - sum(gs for (i,gs) in bus_gs)*vm^2
     )
@@ -78,6 +81,7 @@ function constraint_power_balance_ac(pm::_PM.AbstractACPModel, n::Int, i::Int, b
         + sum(qconv_grid_ac[c] for c in bus_convs_ac)
         ==
         sum(qg[g] for g in bus_gens)
+        - sum(qs[s] for s in bus_storage)
         - sum(qflex[d] for d in bus_loads)
         + sum(bs for (i,bs) in bus_bs)*vm^2
     )

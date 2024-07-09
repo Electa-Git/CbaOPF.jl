@@ -93,8 +93,11 @@ end
 
 function constraint_gen_redispatch(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     gen     = _PM.ref(pm, nw, :gen, i)
-    pg_ref  = gen["pg"]
-    constraint_gen_redispatch(pm, nw, i, pg_ref)
+
+    if haskey(gen, "pg")
+        pg_ref  = gen["pg"]
+        constraint_gen_redispatch(pm, nw, i, pg_ref)
+    end
 end
 
 
@@ -215,6 +218,16 @@ function constraint_storage_initial_state(pm::_PM.AbstractPowerModel, i::Int; nw
     end
 
     constraint_storage_initial_state(pm, nw, i, storage["energy"], storage["charge_efficiency"], storage["discharge_efficiency"], time_elapsed)
+end
+
+# Constraint to set the on/off state of storage devices for the interatia and FCR model
+function constraint_storage_on_off(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    storage     = _PM.ref(pm, nw, :storage, i)
+    charge_rating = storage["charge_rating"]
+    discharge_rating = storage["discharge_rating"]
+
+    nw_ref = get_reference_network_id(pm, nw)
+    constraint_storage_on_off(pm, nw_ref, i, charge_rating, discharge_rating)
 end
 
 # Constraint template for AC nodes power balance
@@ -876,12 +889,14 @@ end
 
 function constraint_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
     reference_network_idx = get_reference_network_id(pm, nw)
-
     areas = [i for i in _PM.ids(pm, nw, :areas)]
     for area in areas
-        for (b, branch) in _PM.ref(pm, nw, :branchdc)
-            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
-                constraint_converter_contingency(pm, c, reference_network_idx, zone)
+        for (t, tieline) in _PM.ref(pm, nw, :tie_lines)
+            if (haskey(tieline, "area_fr") && _PM.ref(pm, nw, :areas, area)["area"] == tieline["area_fr"])  || (haskey(tieline, "area_to") && _PM.ref(pm, nw, :areas, area)["area"] == tieline["area_to"]) 
+                br_idx = tieline["br_idx"]
+                fbus = _PM.ref(pm, nw, :branch, br_idx)["f_bus"]
+                tbus = _PM.ref(pm, nw, :branch, br_idx)["t_bus"]
+                constraint_tieline_contingency(pm, br_idx, fbus, tbus, reference_network_idx, area)
             end
         end
     end
@@ -889,30 +904,35 @@ end
 
 function constraint_tieline_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
     reference_network_idx = get_reference_network_id(pm, nw)
-    bigM = 2 * maximum([conv["Pacrated"] for (c, conv) in _PM.ref(pm, nw, :convdc)])
+    bigM = 2 * maximum([branch["rate_a"] for (b, branch) in _PM.ref(pm, nw, :branch)])
 
-    conv = _PM.ref(pm, nw, :convdc, i)
-    conv_zone = conv["zone"]
-    zones = [z for z in _PM.ids(pm, nw, :zones)]
-    for z in zones
-        zone = _PM.ref(pm, nw, :zones, z)["zone"]
-        if conv_zone == zone
-            constraint_converter_contingency_indicator(pm, i, reference_network_idx, bigM, z)
+    tieline = _PM.ref(pm, nw, :tie_lines, i)
+    br_idx = tieline["br_idx"]
+    fbus = _PM.ref(pm, nw, :branch, br_idx)["f_bus"]
+    tbus = _PM.ref(pm, nw, :branch, br_idx)["t_bus"]
+    areas = [a for a in _PM.ids(pm, nw, :areas)]
+    for a in areas
+        area = _PM.ref(pm, nw, :areas, a)
+        if (haskey(tieline, "area_fr") && _PM.ref(pm, nw, :areas, a)["area"] == tieline["area_fr"])  || (haskey(tieline, "area_to") && _PM.ref(pm, nw, :areas, a)["area"] == tieline["area_to"]) 
+            constraint_tieline_contingency_indicator(pm, i, br_idx, fbus, tbus, reference_network_idx, bigM, a)
         end
     end
 end
 
 function constraint_select_tieline_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
     reference_network_idx = get_reference_network_id(pm, nw)
-    zones = [z for z in _PM.ids(pm, nw, :zones)]
-    for zone in zones
-        zone_convs = []
-        for (c, conv) in _PM.ref(pm, nw, :convdc)
-            if haskey(conv, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == conv["zone"]
-                append!(zone_convs, c)
+    areas = [i for i in _PM.ids(pm, nw, :areas)]
+    for area in areas
+        tielines = []
+        for (t, tieline) in _PM.ref(pm, nw, :tie_lines)
+            if (haskey(tieline, "area_fr") && _PM.ref(pm, nw, :areas, area)["area"] == tieline["area_fr"]) || (haskey(tieline, "area_to") && _PM.ref(pm, nw, :areas, area)["area"] == tieline["area_to"]) # one constraint should be enough per area: To be checked
+                append!(tielines, t)
             end
         end
-        constraint_select_converter_contingency(pm, reference_network_idx, zone_convs)
+        if !isempty(tielines)
+            println(area, " ", tielines)
+            constraint_select_tieline_contingency(pm, reference_network_idx, tielines)
+        end
     end 
 end
 
@@ -937,27 +957,40 @@ end
 #     constraint_branch_contingency_indicator(pm, i, nw, br_idx, bigM)
 # end
 
-function constraint_frequency_droop_lean(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+function constraint_frequency_droop_lean(pm::_PM.AbstractPowerModel, zone_id; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
     ref_id = get_reference_network_id(pm, nw)
     generator_properties = Dict()
     zone_convs = Dict()
+    storage_properties = Dict()
+    zone = _PM.ref(pm, nw, :zones, zone_id)["zone"]
+
     for (g, gen) in _PM.ref(pm, nw, :gen)
         if haskey(gen, "zone")
-            zone = gen["zone"]
-            if !haskey(generator_properties, zone)
-                generator_properties[zone] = Dict()
+            gen_zone = gen["zone"]
+            if !haskey(generator_properties, gen_zone)
+                generator_properties[gen_zone] = Dict()
             end
-        push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        push!(generator_properties[gen_zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (s, storage) in _PM.ref(pm, nw, :storage)
+        if haskey(storage, "zone")
+            st_zone = storage["zone"]
+            if !haskey(storage_properties, st_zone)
+                storage_properties[st_zone] = Dict()
+            end
+        push!(storage_properties[st_zone], s => Dict("inertia" => storage["inertia_constants"], "rating" => storage["thermal_rating"]))
         end
     end
 
     for (c, conv) in _PM.ref(pm, nw, :convdc)
         if haskey(conv, "zone")
-            zone = conv["zone"] 
-            if !haskey(zone_convs, zone)
-                zone_convs[zone] = Dict()
+            conv_zone = conv["zone"] 
+            if !haskey(zone_convs, conv_zone)
+                zone_convs[conv_zone] = Dict()
             end
-            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+            push!(zone_convs[conv_zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
         end
     end
 
@@ -978,41 +1011,52 @@ function constraint_frequency_droop_lean(pm::_PM.AbstractPowerModel; nw::Int = _
     else
         excluded_zones = []
     end
-    
-    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
-    for i in zones
-        zone = _PM.ref(pm, nw, :zones, i)["zone"]
+    zones = [z["zone"] for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    zone_ids = [i for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    if any(zone .== zones)
         if haskey(generator_properties, zone)
             g_properties = generator_properties[zone]
         else
             g_properties = Dict()
+        end
+        if haskey(storage_properties, zone)
+            s_properties = storage_properties[zone]
+        else
+            s_properties = 0
         end
         if haskey(zone_convs, zone)
             z_convs = zone_convs[zone]
         else
             z_convs = Dict()
         end
-        constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true)
-        for j in setdiff(zones, i)
+        constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, zone_id, zone_cont = true)
+        for j in setdiff(zone_ids, zone_id)
             zone_ = _PM.ref(pm, nw, :zones, j)["zone"]
             if haskey(generator_properties, zone_)
                 g_properties = generator_properties[zone_]
             else
                 g_properties = Dict()
             end
+            if haskey(storage_properties, zone)
+                s_properties = storage_properties[zone_]
+            else
+                s_properties = 0
+            end
             if haskey(zone_convs, zone_)
                 z_convs = zone_convs[zone_]
             else
                 z_convs = Dict()
             end
-            constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false)
+            constraint_frequency_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false)
         end
     end
 end
 
-function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel, zone_id; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
     ref_id = get_reference_network_id(pm, nw)
+    zone = _PM.ref(pm, nw, :zones, zone_id)["zone"]
     generator_properties = Dict()
+    storage_properties = Dict()
     zone_convs = Dict()
     for (g, gen) in _PM.ref(pm, nw, :gen)
         if haskey(gen, "zone")
@@ -1021,6 +1065,16 @@ function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel; n
                 generator_properties[zone] = Dict()
             end
         push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (s, storage) in _PM.ref(pm, nw, :storage)
+        if haskey(storage, "zone")
+            st_zone = storage["zone"]
+            if !haskey(storage_properties, st_zone)
+                storage_properties[st_zone] = Dict()
+            end
+        push!(storage_properties[st_zone], s => Dict("inertia" => storage["inertia_constants"], "rating" => storage["thermal_rating"]))
         end
     end
 
@@ -1052,13 +1106,18 @@ function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel; n
         excluded_zones = []
     end
     
-    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
-    for i in zones
-        zone = _PM.ref(pm, nw, :zones, i)["zone"]
+    zones = [z["zone"] for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    zone_ids = [i for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    if any(zone .== zones)
         if haskey(generator_properties, zone)
             g_properties = generator_properties[zone]
         else
             g_properties = Dict()
+        end
+        if haskey(storage_properties, zone)
+            s_properties = storage_properties[zone]
+        else
+            s_properties = 0
         end
         if haskey(zone_convs, zone)
             z_convs = zone_convs[zone]
@@ -1066,22 +1125,312 @@ function constraint_frequency_converter_droop_lean(pm::_PM.AbstractPowerModel; n
             z_convs = Dict()
         end
         
-        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true, direction = "plus")
-        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, i, zone_cont = true, direction = "minus")
-        for j in setdiff(zones, i)
+        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, zone_id, zone_cont = true, direction = "plus")
+        constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, zone_id, zone_cont = true, direction = "minus")
+        for j in setdiff(zone_ids, zone_id)
             zone_ = _PM.ref(pm, nw, :zones, j)["zone"]
             if haskey(generator_properties, zone_)
                 g_properties = generator_properties[zone_]
             else
                 g_properties = Dict()
             end
+            if haskey(storage_properties, zone_)
+                s_properties = storage_properties[zone_]
+            else
+                s_properties = Dict()
+            end
             if haskey(zone_convs, zone_)
                 z_convs = zone_convs[zone_]
             else
                 z_convs = Dict()
             end
-            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "plus")
-            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "minus")
+            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "plus")
+            constraint_frequency_converter_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "minus")
         end
     end
+end
+
+
+function constraint_frequency_tieline_droop_lean(pm::_PM.AbstractPowerModel, area_id; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    ref_id = get_reference_network_id(pm, nw)
+    area = _PM.ref(pm, nw, :areas, area_id)["area"]
+    generator_properties = Dict()
+    storage_properties = Dict()
+    area_convs = Dict()
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if haskey(gen, "area")
+            area = gen["area"]
+            if !haskey(generator_properties, area)
+                generator_properties[area] = Dict()
+            end
+        push!(generator_properties[area], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (s, storage) in _PM.ref(pm, nw, :storage)
+        if haskey(storage, "area")
+            st_area = storage["area"]
+            if !haskey(storage_properties, st_area)
+                storage_properties[st_area] = Dict()
+            end
+        push!(storage_properties[st_area], s => Dict("inertia" => storage["inertia_constants"], "rating" => storage["thermal_rating"]))
+        end
+    end
+
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "area")
+            area = conv["area"] 
+            if !haskey(area_convs, area)
+                area_convs[area] = Dict()
+            end
+            push!(area_convs[area], c => Dict("t_hvdc" => conv["t_hvdc"]))
+        end
+    end
+
+    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+    ΔTin = frequency_parameters["t_fcr"]
+    ΔTdroop = frequency_parameters["t_fcrd"]
+    fmin = frequency_parameters["fmin"]
+    fmax = frequency_parameters["fmax"]
+    f0 = frequency_parameters["f0"]
+    Δfss = frequency_parameters["delta_fss"]
+    if haskey(frequency_parameters, "fdb")
+        fdb = frequency_parameters["fdb"]
+    else
+        fdb = 0
+    end
+    if haskey(_PM.ref(pm, nw), :excluded_areas)
+        excluded_areas = _PM.ref(pm, nw, :excluded_areas)
+    else
+        excluded_areas = []
+    end
+    
+    areas = [a["area"] for (i,a) in _PM.ref(pm, nw, :areas) if !any(a["area"] .== excluded_areas)]
+    area_ids = [i for (i,a) in _PM.ref(pm, nw, :areas) if !any(a["area"] .== excluded_areas)]
+    if any(area .== areas)
+        if haskey(generator_properties, area)
+            g_properties = generator_properties[area]
+        else
+            g_properties = Dict()
+        end
+        if haskey(storage_properties, area)
+            s_properties = storage_properties[area]
+        else
+            s_properties = Dict()
+        end
+        if haskey(area_convs, area)
+            a_convs = area_convs[area]
+        else
+            a_convs = Dict()
+        end
+        
+        constraint_frequency_tieline_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, a_convs, hvdc_contribution, area_id, zone_cont = true, direction = "fr")
+        constraint_frequency_tieline_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, a_convs, hvdc_contribution, area_id, zone_cont = true, direction = "to")
+
+        for j in setdiff(area_ids, area_id)
+            area_ = _PM.ref(pm, nw, :areas, j)["area"]
+            if haskey(generator_properties, area_)
+                g_properties = generator_properties[area_]
+            else
+                g_properties = Dict()
+            end
+            if haskey(storage_properties, area_)
+                s_properties = storage_properties[area_]
+            else
+                s_properties = Dict()
+            end
+            if haskey(area_convs, area_)
+                a_convs = area_convs[area_]
+            else
+                a_convs = Dict()
+            end
+            constraint_frequency_tieline_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, a_convs, hvdc_contribution, j, zone_cont = false, direction = "fr")
+            constraint_frequency_tieline_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, a_convs, hvdc_contribution, j, zone_cont = false, direction = "to")
+        end
+    end
+end
+
+
+function constraint_frequency_storage_droop_lean(pm::_PM.AbstractPowerModel, zone_id; nw::Int = _PM.nw_id_default, hvdc_contribution = false)
+    ref_id = get_reference_network_id(pm, nw)
+    zone = _PM.ref(pm, nw, :zones, zone_id)["zone"]
+    generator_properties = Dict()
+    storage_properties = Dict()
+    zone_convs = Dict()
+    for (g, gen) in _PM.ref(pm, nw, :gen)
+        if haskey(gen, "zone")
+            zone = gen["zone"]
+            if !haskey(generator_properties, zone)
+                generator_properties[zone] = Dict()
+            end
+        push!(generator_properties[zone], g => Dict("inertia" => gen["inertia_constants"], "rating" => gen["pmax"]))
+        end
+    end
+
+    for (s, storage) in _PM.ref(pm, nw, :storage)
+        if haskey(storage, "zone")
+            st_zone = storage["zone"]
+            if !haskey(storage_properties, st_zone)
+                storage_properties[st_zone] = Dict()
+            end
+        push!(storage_properties[st_zone], s => Dict("inertia" => storage["inertia_constants"], "rating" => storage["thermal_rating"]))
+        end
+    end
+
+    for (c, conv) in _PM.ref(pm, nw, :convdc)
+        if haskey(conv, "zone")
+            zone = conv["zone"] 
+            if !haskey(zone_convs, zone)
+                zone_convs[zone] = Dict()
+            end
+            push!(zone_convs[zone], c => Dict("t_hvdc" => conv["t_hvdc"]))
+        end
+    end
+
+    frequency_parameters = _PM.ref(pm, nw, :frequency_parameters)
+    ΔTin = frequency_parameters["t_fcr"]
+    ΔTdroop = frequency_parameters["t_fcrd"]
+    fmin = frequency_parameters["fmin"]
+    fmax = frequency_parameters["fmax"]
+    f0 = frequency_parameters["f0"]
+    Δfss = frequency_parameters["delta_fss"]
+    if haskey(frequency_parameters, "fdb")
+        fdb = frequency_parameters["fdb"]
+    else
+        fdb = 0
+    end
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    
+    zones = [z["zone"] for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    zone_ids = [i for (i,z) in _PM.ref(pm, nw, :zones) if !any(z["zone"] .== excluded_zones)]
+    if any(zone .== zones)
+        if haskey(generator_properties, zone)
+            g_properties = generator_properties[zone]
+        else
+            g_properties = Dict()
+        end
+        if haskey(storage_properties, zone)
+            s_properties = storage_properties[zone]
+        else
+            s_properties = 0
+        end
+        if haskey(zone_convs, zone)
+            z_convs = zone_convs[zone]
+        else
+            z_convs = Dict()
+        end
+        
+        constraint_frequency_storage_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, zone_id, zone_cont = true, direction = "plus")
+        constraint_frequency_storage_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, zone_id, zone_cont = true, direction = "minus")
+        for j in setdiff(zone_ids, zone_id)
+            zone_ = _PM.ref(pm, nw, :zones, j)["zone"]
+            if haskey(generator_properties, zone_)
+                g_properties = generator_properties[zone_]
+            else
+                g_properties = Dict()
+            end
+            if haskey(storage_properties, zone_)
+                s_properties = storage_properties[zone_]
+            else
+                s_properties = Dict()
+            end
+            if haskey(zone_convs, zone_)
+                z_convs = zone_convs[zone_]
+            else
+                z_convs = Dict()
+            end
+            constraint_frequency_storage_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "plus")
+            constraint_frequency_storage_droop_lean(pm, nw, ref_id, g_properties, s_properties, ΔTin, ΔTdroop, f0, fmin, fmax, fdb, Δfss, z_convs, hvdc_contribution, j, zone_cont = false, direction = "minus")
+        end
+    end
+end
+
+
+function constraint_storage_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        for (s, storage) in _PM.ref(pm, nw, :storage)
+            if haskey(storage, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == storage["zone"]
+                constraint_storage_contingency(pm, s, reference_network_idx, zone)
+            end
+        end
+    end 
+end
+
+function constraint_storage_contingency_indicator(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+
+    bigM = 2 * maximum([storage["thermal_rating"] for (s, storage) in _PM.ref(pm, nw, :storage)])
+    storage = _PM.ref(pm, nw, :storage, i)
+    storage_zone = storage["zone"]
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for z in zones
+        zone = _PM.ref(pm, nw, :zones, z)["zone"]
+        if storage_zone == zone
+            constraint_storage_contingency_indicator(pm, i, reference_network_idx, bigM, z)
+        end
+    end
+end
+
+function constraint_select_storage_contingency(pm::_PM.AbstractPowerModel; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    if haskey(_PM.ref(pm, nw), :excluded_zones)
+        excluded_zones = _PM.ref(pm, nw, :excluded_zones)
+    else
+        excluded_zones = []
+    end
+    
+    zones = [i for i in _PM.ids(pm, nw, :zones) if !any(i .== excluded_zones)]
+    for zone in zones
+        zone_storages = []
+        for (s, storage) in _PM.ref(pm, nw, :storage)
+            if haskey(storage, "zone") && _PM.ref(pm, nw, :zones, zone)["zone"] == storage["zone"]
+                append!(zone_storages, s)
+            end
+        end
+        constraint_select_storage_contingency(pm, reference_network_idx, zone_storages)
+    end 
+end
+
+function constraint_storage_droop(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    storage = _PM.ref(pm, nw, :storage, i)
+    ramp_rate = storage["ramp_rate_per_s"]
+
+    ΔTin = _PM.ref(pm, nw, :frequency_parameters)["t_fcr"]
+    ΔTdroop = _PM.ref(pm, nw, :frequency_parameters)["t_fcrd"]
+
+    return constraint_storage_droop(pm, i, nw, ramp_rate, ΔTin, ΔTdroop)
+end
+
+function constraint_storage_droop_absolute(pm::_PM.AbstractPowerModel, i::Int; nw::Int = _PM.nw_id_default)
+    constraint_storage_droop_absolute(pm, i, nw)
+end
+
+
+
+
+
+
+function constraint_converter_outage(pm::_PM.AbstractPowerModel, i; nw::Int = _PM.nw_id_default)
+    reference_network_idx = get_reference_network_id(pm, nw)
+    prated = _PM.ref(pm, nw, :convdc, i)["Pacrated"]
+
+    constraint_converter_outage(pm, nw, i, prated, reference_network_idx)
 end

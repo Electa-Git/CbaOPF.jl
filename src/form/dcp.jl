@@ -47,7 +47,7 @@ function constraint_power_balance_ac(pm::_PM.AbstractDCPModel, n::Int, i::Int, b
     pg   = _PM.var(pm, n,   :pg)
     pconv_grid_ac = _PM.var(pm, n,  :pconv_tf_fr)
     pflex = _PM.var(pm, n, :pflex)
-
+    ps    = _PM.var(pm, n, :ps)
 
     cstr_p = JuMP.@constraint(pm.model,
         sum(p[a] for a in bus_arcs)
@@ -55,6 +55,7 @@ function constraint_power_balance_ac(pm::_PM.AbstractDCPModel, n::Int, i::Int, b
         + sum(pconv_grid_ac[c] for c in bus_convs_ac)
         ==
         sum(pg[g] for g in bus_gens)
+        - sum(ps[s] for s in bus_storage)
         - sum(pflex[d] for d in bus_loads)
         - sum(gs for (i,gs) in bus_gs)*1^2
     )
@@ -127,6 +128,20 @@ function constraint_generator_on_off(pm::_PM.AbstractDCPModel, n::Int, nw_ref, i
     JuMP.@constraint(pm.model,  pg <= pmax * alpha_g)
     JuMP.@constraint(pm.model,  pg >= pmin * alpha_g)
     JuMP.@constraint(pm.model,  alpha_g >= status)
+end
+
+function constraint_storage_on_off(pm::_PM.AbstractDCPModel, n::Int, i, charge_rating, discharge_rating)
+    pc = _PM.var(pm, n, :sc, i)
+    pd = _PM.var(pm, n, :sd, i)
+    ps = _PM.var(pm, n, :ps, i)
+    alpha_s = _PM.var(pm, n, :alpha_s, i)
+
+    JuMP.@constraint(pm.model,  pc <= charge_rating * alpha_s)
+    JuMP.@constraint(pm.model,  pc >= 0)
+    JuMP.@constraint(pm.model,  pd <= discharge_rating * alpha_s)
+    JuMP.@constraint(pm.model,  pd >= 0)
+    JuMP.@constraint(pm.model,  ps <= discharge_rating * alpha_s)
+    JuMP.@constraint(pm.model,  ps >= -discharge_rating * alpha_s)
 end
 
 function constraint_variable_branch_capacity_from(pm::_PM.AbstractDCPModel, n::Int, f_idx, pmax)

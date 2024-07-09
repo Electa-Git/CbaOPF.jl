@@ -14,6 +14,7 @@ function build_fsrdopf(pm::_PM.AbstractPowerModel)
 
         _PM.constraint_model_voltage(pm; nw = n)
         _PMACDC.constraint_voltage_dc(pm; nw = n)
+        _PM.variable_storage_power(pm; nw = n)
 
         variable_inertia(pm; nw = n)
         variable_hvdc_contribution(pm; nw = n)

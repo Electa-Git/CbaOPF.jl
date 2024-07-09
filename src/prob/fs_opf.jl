@@ -8,6 +8,7 @@ function build_fsopf(pm::_PM.AbstractPowerModel)
         _PM.variable_bus_voltage(pm; nw = n)
         _PM.variable_gen_power(pm; nw = n)
         _PM.variable_branch_power(pm; nw = n)
+        _PM.variable_storage_power(pm; nw = n)
 
         _PMACDC.variable_active_dcbranch_flow(pm; nw = n)
         _PMACDC.variable_dcbranch_current(pm; nw = n)

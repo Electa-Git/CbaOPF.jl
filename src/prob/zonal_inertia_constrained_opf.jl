@@ -7,6 +7,7 @@ function build_inertia_opf(pm::_PM.AbstractPowerModel)
     _PM.variable_gen_power(pm)
     _PM.variable_branch_power(pm)
     _PM.constraint_model_voltage(pm)
+    _PM.variable_storage_power(pm; nw = n)
 
     _PM.objective_min_fuel_cost(pm)
 
